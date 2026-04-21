@@ -1,0 +1,90 @@
+/* Подсказка редактору, что это PostCSS */
+@supports (color: oklch(0% 0 0)) {
+  /* ничего, просто хак для VS Code */
+}
+
+/* Tailwind v4 */
+@import "tailwindcss";
+
+/* CSS-переменные */
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+/* Tailwind v4 тема */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* Тёмная тема */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+/* Базовые стили */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Tailwind слои */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Улучшение типографики */
+@layer base {
+  body {
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Карточки */
+@layer components {
+  .card {
+    @apply bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm transition-all duration-300;
+  }
+
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 20px 25px -5px rgb(0 0 0 / 0.1),
+      0 8px 10px -6px rgb(0 0 0 / 0.1);
+  }
+
+  /* Кнопки */
+  .btn-primary {
+    @apply bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-medium px-6 py-3 rounded-2xl transition-all active:scale-[0.985];
+  }
+}
+
+/* Инпуты */
+@layer utilities {
+  input,
+  select,
+  textarea {
+    transition: all 0.2s ease;
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus {
+    box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.15);
+    border-color: #1de141;
+  }
+}
+
+/* Мобильные карточки */
+@media (max-width: 640px) {
+  .card {
+    padding: 1.25rem;
+  }
+}
