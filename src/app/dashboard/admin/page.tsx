@@ -11,7 +11,7 @@ type UnpaidDoneOrder = {
   client_name: string
   price: number
   planned_date: string | null
-  profiles?: { full_name: string } | null
+  profiles?: { full_name: string }[] | null
 }
 
 export default function AdminDashboard() {
@@ -122,8 +122,8 @@ export default function AdminDashboard() {
                     <div>
                       <div className="font-medium">{order.client_name}</div>
                       <div className="text-sm text-zinc-500">
-                        {order.profiles?.full_name 
-                          ? `Клинер: ${order.profiles.full_name}` 
+                        {order.profiles?.[0]?.full_name 
+                          ? `Клинер: ${order.profiles[0].full_name}` 
                           : 'Клинер не указан'}
                       </div>
                     </div>
