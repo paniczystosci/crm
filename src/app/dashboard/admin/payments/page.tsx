@@ -1,4 +1,4 @@
-// src/app/(dashboard)/admin/payments/page.tsx
+// src/app/dashboard/admin/payments/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -11,17 +11,20 @@ type PaymentOrder = {
   price: number
   planned_date?: string
   cleaner_id?: string
-  salary_type?: 'fixed' | 'percent' | 'fixed_plus_percent' | 'manual'
+  salary_type?: string
   salary_value?: number | null
   is_paid_to_cleaner: boolean
   paid_at?: string
-  profiles?: { full_name: string } | null
+  profiles?: { 
+    full_name: string 
+    payout_rate: string   // ← НОВОЕ
+  } | null
 }
 
 export default function AdminPayments() {
   const [orders, setOrders] = useState<PaymentOrder[]>([])
   const [manualSalary, setManualSalary] = useState<Record<string, number>>({})
-  const [filter, setFilter] = useState<'all' | 'unpaid' | 'paid'>('unpaid')
+  const [filter, setFilter] = useState<'all' | 'unpaid' | 'paid'>('unpaid') // ← по умолчанию unpaid
   const [loading, setLoading] = useState(true)
   const [totalToPay, setTotalToPay] = useState(0)
 
@@ -38,7 +41,7 @@ export default function AdminPayments() {
       .from('orders')
       .select(`
         *,
-        profiles!cleaner_id (full_name)
+        profiles!cleaner_id (full_name, payout_rate)
       `)
       .order('planned_date', { ascending: false })
 
@@ -51,7 +54,6 @@ export default function AdminPayments() {
     const ordersList = data || []
     setOrders(ordersList)
 
-    // сумма к выплате
     const unpaid = ordersList.filter(o => !o.is_paid_to_cleaner)
     const total = unpaid.reduce((sum, order) => sum + calculateSalary(order), 0)
     setTotalToPay(total)
@@ -59,36 +61,34 @@ export default function AdminPayments() {
     setLoading(false)
   }
 
+  // ← УЛУЧШЕННЫЙ расчёт (работает с настройкой из profiles)
   function calculateSalary(order: PaymentOrder): number {
-    if (!order.price) return 0
-
-    switch (order.salary_type) {
-      case 'fixed':
-        return order.salary_value || 0
-      case 'percent':
-        return order.price * ((order.salary_value || 0) / 100)
-      case 'fixed_plus_percent':
-        return (order.salary_value || 0) + order.price * 0.1
-      case 'manual':
-        return order.salary_value || 0
-      default:
-        return 0
+    // Если уже есть сохранённая сумма — используем её
+    if (order.salary_value !== null && order.salary_value !== undefined) {
+      return order.salary_value
     }
+
+    // Новая логика — берём ставку клинера из профиля
+    const rate = order.profiles?.payout_rate
+    if (!rate || rate === 'manual') {
+      return 0 // будет редактироваться вручную
+    }
+
+    const percent = parseInt(rate)
+    return Math.round(order.price * (percent / 100))
   }
 
-  // Выплата с ручной суммой
   const markAsPaid = async (order: PaymentOrder) => {
-    const salary =
-      manualSalary[order.id] !== undefined
-        ? manualSalary[order.id]
-        : calculateSalary(order)
+    const salary = manualSalary[order.id] !== undefined 
+      ? manualSalary[order.id] 
+      : calculateSalary(order)
 
     const { error } = await supabase
       .from('orders')
       .update({
         is_paid_to_cleaner: true,
         paid_at: new Date().toISOString(),
-        salary_value: salary // ← записываем вручную введённую сумму
+        salary_value: salary
       })
       .eq('id', order.id)
 
@@ -186,14 +186,13 @@ export default function AdminPayments() {
 
                       <td className="p-6 font-medium">{order.price} zł</td>
 
-                      <td className="p-6">
-                        <span className="capitalize text-sm">
-                          {order.salary_type === 'fixed' && 'Фиксированная'}
-                          {order.salary_type === 'percent' && `Процент (${order.salary_value}%)`}
-                          {order.salary_type === 'fixed_plus_percent' && 'Фикс + %'}
-                          {order.salary_type === 'manual' && 'Ручная'}
-                        </span>
-                      </td>
+<td className="p-6">
+  <span className="text-sm font-medium">
+    {order.profiles?.payout_rate === 'manual'
+      ? 'Ручная'
+      : `${order.profiles?.payout_rate}%`}
+  </span>
+</td>
 
                       <td className="p-6 text-right font-semibold text-emerald-600">
                         {!isPaid ? (

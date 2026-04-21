@@ -21,13 +21,14 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
 export async function createNewUser(
   fullName: string,
   email: string,
-  role: 'admin' | 'cleaner'
+  role: 'admin' | 'cleaner',
+  payoutRate: string = '25'   // ← НОВОЕ
 ) {
   try {
     // 1. Создаём пользователя в Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email.trim().toLowerCase(),
-      password: '123456',           // временный пароль
+      password: '123456',
       email_confirm: true,
     })
 
@@ -36,13 +37,14 @@ export async function createNewUser(
       return { success: false, error: authError.message }
     }
 
-    // 2. Создаём профиль в таблице profiles
+    // 2. Создаём профиль
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .insert({
         id: authData.user.id,
         full_name: fullName.trim(),
         role: role,
+        payout_rate: payoutRate,          // ← НОВОЕ
       })
 
     if (profileError) {
@@ -55,7 +57,7 @@ export async function createNewUser(
 
     return { 
       success: true, 
-      message: `Пользователь ${fullName} успешно создан!\nEmail: ${email}\nВременный пароль: 123456` 
+      message: `Пользователь ${fullName} успешно создан!\nEmail: ${email}\nВременный пароль: 123456\nСтавка: ${payoutRate === 'manual' ? 'Ручная' : payoutRate + '%'}` 
     }
 
   } catch (err: any) {

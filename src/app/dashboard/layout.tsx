@@ -122,6 +122,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <>
                 <SidebarLink href="/dashboard/cleaner" icon="📋" active={pathname === '/dashboard/cleaner'}>Мои заказы</SidebarLink>
                 <SidebarLink href="/dashboard/cleaner/new" icon="➕" active={pathname === '/dashboard/cleaner/new'}>Новый заказ</SidebarLink>
+                <SidebarLink href="/dashboard/cleaner/cash" icon="💰" active={pathname === '/dashboard/cleaner/cash'}>Касса</SidebarLink>
+                
               </>
             )}
           </nav>
@@ -146,6 +148,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <>
                     <MobileSidebarLink href="/dashboard/cleaner" icon="📋">Мои заказы</MobileSidebarLink>
                     <MobileSidebarLink href="/dashboard/cleaner/new" icon="➕">Новый заказ</MobileSidebarLink>
+                    <MobileSidebarLink href="/dashboard/cleaner/cash" icon="💰">Касса</MobileSidebarLink>
                   </>
                 )}
               </nav>
