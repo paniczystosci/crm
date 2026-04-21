@@ -96,7 +96,7 @@ export default function AdminStats() {
       .map((o) => ({
         order_id: o.id,
         client_name: o.client_name,
-        cleaner_name: o.profiles?.full_name || 'Неизвестный клинер',
+        cleaner_name: o.profiles?.[0]?.full_name || 'Неизвестный клинер',
         amount: o.salary_value!,
         paid_at: o.paid_at!,
       }))
