@@ -4,8 +4,10 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { LogOut, User, Menu, X, Sun, Moon, LayoutDashboard, ClipboardList, Users, BarChart3, DollarSign, Plus, Wallet } from 'lucide-react'
+import { LogOut, User, Menu, X, Sun, Moon, LayoutDashboard, ClipboardList, Users, BarChart3, DollarSign, Plus, Wallet, Bell } from 'lucide-react'
 import Link from 'next/link'
+import { useUnreadMessages } from '@/hooks/useUnreadMessages'
+import { NotificationSound } from '@/components/NotificationSound'
 
 type Role = 'admin' | 'cleaner'
 
@@ -15,6 +17,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isDark, setIsDark] = useState(false)
+  const { totalUnread } = useUnreadMessages()
 
   const router = useRouter()
   const pathname = usePathname()
@@ -74,17 +77,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isAdmin = role === 'admin'
 
   const adminNavItems = [
-    { href: '/dashboard/admin', label: 'Главная', icon: LayoutDashboard },
-    { href: '/dashboard/admin/orders', label: 'Заказы', icon: ClipboardList },
-    { href: '/dashboard/admin/cleaners', label: 'Клинеры', icon: Users },
-    { href: '/dashboard/admin/stats', label: 'Статистика', icon: BarChart3 },
-    { href: '/dashboard/admin/payments', label: 'Выплаты', icon: DollarSign },
+    { href: '/dashboard/admin', label: 'Главная', icon: LayoutDashboard, showNotification: false },
+    { href: '/dashboard/admin/orders', label: 'Заказы', icon: ClipboardList, showNotification: true },
+    { href: '/dashboard/admin/cleaners', label: 'Клинеры', icon: Users, showNotification: false },
+    { href: '/dashboard/admin/stats', label: 'Статистика', icon: BarChart3, showNotification: false },
+    { href: '/dashboard/admin/payments', label: 'Выплаты', icon: DollarSign, showNotification: false },
   ]
 
   const cleanerNavItems = [
-    { href: '/dashboard/cleaner', label: 'Мои заказы', icon: ClipboardList },
-    { href: '/dashboard/cleaner/new', label: 'Новый заказ', icon: Plus },
-    { href: '/dashboard/cleaner/cash', label: 'Касса', icon: Wallet },
+    { href: '/dashboard/cleaner', label: 'Мои заказы', icon: ClipboardList, showNotification: true },
+    { href: '/dashboard/cleaner/new', label: 'Новый заказ', icon: Plus, showNotification: false },
+    { href: '/dashboard/cleaner/cash', label: 'Касса', icon: Wallet, showNotification: false },
   ]
 
   const navItems = isAdmin ? adminNavItems : cleanerNavItems
@@ -92,6 +95,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       
+      {/* Компонент для звуковых уведомлений */}
+      <NotificationSound />
+
       {/* Top Navbar */}
       <nav className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 sticky top-0 z-40">
         <div className="px-4 sm:px-6 py-4 flex items-center justify-between">
@@ -115,9 +121,43 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           </div>
 
-          <div className="md:hidden flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
-              <User size={14} className="text-white" />
+          <div className="flex items-center gap-3">
+            {/* Иконка уведомлений в топ-баре */}
+            <div className="relative">
+              <button 
+                onClick={() => {
+                  if (isAdmin) {
+                    router.push('/dashboard/admin/orders')
+                  } else {
+                    router.push('/dashboard/cleaner')
+                  }
+                }}
+                className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
+              >
+                <Bell size={20} className="text-gray-700 dark:text-gray-300" />
+                {totalUnread > 0 && (
+                  <>
+                    <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-5 px-1.5 flex items-center justify-center shadow-lg animate-pulse">
+                      {totalUnread > 99 ? '99+' : totalUnread}
+                    </div>
+                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Кнопка переключения темы */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              {isDark ? <Sun size={20} className="text-amber-500" /> : <Moon size={20} className="text-gray-700" />}
+            </button>
+
+            <div className="md:hidden flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
+                <User size={14} className="text-white" />
+              </div>
             </div>
           </div>
         </div>
@@ -176,6 +216,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {navItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+            const showNotification = item.showNotification && totalUnread > 0
             
             return (
               <Link
@@ -189,7 +230,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 }`}
               >
                 <Icon size={20} className={isActive ? 'text-white' : 'text-gray-500 group-hover:text-emerald-500'} />
-                <span className="font-medium">{item.label}</span>
+                <span className="font-medium flex-1">{item.label}</span>
+                
+                {/* Бейдж с количеством непрочитанных сообщений */}
+                {showNotification && (
+                  <div className="relative">
+                    <div className="bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center shadow-lg animate-pulse">
+                      {totalUnread > 99 ? '99+' : totalUnread}
+                    </div>
+                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
+                  </div>
+                )}
+                
                 {isActive && (
                   <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white"></div>
                 )}
@@ -200,8 +252,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Sidebar Footer */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-800 space-y-2 bg-white dark:bg-gray-900">
+          
+          {/* Theme Toggle в сайдбаре */}
+          <button
+            onClick={toggleTheme}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
+          >
+            <div className="flex items-center gap-3">
+              {isDark ? (
+                <Sun size={20} className="text-amber-500" />
+              ) : (
+                <Moon size={20} className="text-gray-500" />
+              )}
+              <span className="text-gray-700 dark:text-gray-300">
+                {isDark ? 'Светлая тема' : 'Тёмная тема'}
+              </span>
+            </div>
+            <span className="text-xs text-gray-400">
+              {isDark ? '🌙 → ☀️' : '☀️ → 🌙'}
+            </span>
+          </button>
 
-
+          {/* Logout Button */}
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors group"
@@ -212,6 +284,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </span>
           </button>
 
+          {/* Version */}
           <div className="px-4 pt-4 text-center">
             <p className="text-xs text-gray-400">© 2026 Pani Czystości</p>
             <p className="text-xs text-gray-400 mt-0.5">Версия 2.0.0</p>

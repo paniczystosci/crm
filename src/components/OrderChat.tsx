@@ -62,7 +62,6 @@ export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) 
     
     markAsRead()
     
-    // Интервал для обновления статуса (пока чат открыт)
     const interval = setInterval(() => {
       if (document.hasFocus()) {
         markMessagesAsRead(orderId, user.id)
@@ -72,15 +71,6 @@ export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) 
     return () => clearInterval(interval)
   }, [user, orderId])
 
-  // Функция для обновления заголовка
-  const updateTitle = (count: number) => {
-    if (count > 0 && !document.hasFocus()) {
-      document.title = `📩 (${count}) Новое сообщение - ${originalTitleRef.current}`
-    } else {
-      document.title = originalTitleRef.current
-    }
-  }
-
   // Загружаем сообщения и подписываемся на realtime
   useEffect(() => {
     if (!user || !orderId) return
@@ -88,7 +78,16 @@ export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) 
     let isSubscribed = true
     let unreadCount = 0
 
-    const initChat = async () => {
+    // Функция для обновления заголовка
+    const updateTitle = (count: number) => {
+      if (count > 0 && !document.hasFocus()) {
+        document.title = `📩 (${count}) Новое сообщение - ${originalTitleRef.current}`
+      } else {
+        document.title = originalTitleRef.current
+      }
+    }
+
+    const loadMessages = async () => {
       try {
         // Загружаем историю сообщений
         const { data: existingMessages, error } = await supabase
@@ -101,83 +100,95 @@ export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) 
           setMessages(existingMessages)
           scrollToBottom()
         }
-
-        const channel = supabase
-          .channel(`order-messages-${orderId}`)
-          .on(
-            'postgres_changes',
-            {
-              event: 'INSERT',
-              schema: 'public',
-              table: 'order_messages',
-              filter: `order_id=eq.${orderId}`,
-            },
-            async (payload) => {
-              if (!isSubscribed) return
-              
-              // Добавляем новое сообщение
-              setMessages(prev => [...prev, payload.new])
-              scrollToBottom()
-              
-              // Если сообщение не от текущего пользователя
-              if (payload.new.user_id !== user.id) {
-                // Воспроизводим звук
-                playNotificationSound()
-                
-                // Увеличиваем счетчик непрочитанных
-                unreadCount++
-                updateTitle(unreadCount)
-                
-                // Отмечаем как прочитанное если чат активен
-                if (document.hasFocus()) {
-                  await markMessagesAsRead(orderId, user.id)
-                  unreadCount = 0
-                  updateTitle(0)
-                }
-              } else if (document.hasFocus()) {
-                // Если сообщение от пользователя и чат в фокусе
-                await markMessagesAsRead(orderId, user.id)
-              }
-            }
-          )
-          .on('broadcast', { event: 'typing' }, (payload) => {
-            if (isSubscribed) {
-              setTypingUser(payload.payload.user)
-              clearTimeout(typingTimeoutRef.current)
-              typingTimeoutRef.current = setTimeout(() => {
-                if (isSubscribed) setTypingUser(null)
-              }, 1500)
-            }
-          })
-
-        channel.subscribe((status) => {
-          console.log('Channel status:', status)
-        })
-
-        channelRef.current = channel
-
-        // Сброс счетчика при фокусе на окне
-        const handleFocus = async () => {
-          if (unreadCount > 0) {
-            unreadCount = 0
-            updateTitle(0)
-            await markMessagesAsRead(orderId, user.id)
-          }
-        }
-
-        window.addEventListener('focus', handleFocus)
-        
-        return () => {
-          window.removeEventListener('focus', handleFocus)
-        }
-
       } catch (error) {
-        console.error('Error initializing chat:', error)
+        console.error('Error loading messages:', error)
       }
     }
 
-    initChat()
+    const setupRealtime = () => {
+      try {
+        // ВАЖНО: Сначала создаем канал с ВСЕМИ обработчиками
+        const channel = supabase.channel(`order-messages-${orderId}`)
+        
+        // Добавляем обработчик новых сообщений
+        channel.on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'order_messages',
+            filter: `order_id=eq.${orderId}`,
+          },
+          async (payload) => {
+            if (!isSubscribed) return
+            
+            console.log('New message received:', payload.new)
+            
+            // Добавляем новое сообщение
+            setMessages(prev => [...prev, payload.new])
+            scrollToBottom()
+            
+            // Если сообщение не от текущего пользователя
+            if (payload.new.user_id !== user.id) {
+              // Воспроизводим звук
+              playNotificationSound()
+              
+              // Увеличиваем счетчик непрочитанных
+              unreadCount++
+              updateTitle(unreadCount)
+              
+              // Отмечаем как прочитанное если чат активен
+              if (document.hasFocus()) {
+                await markMessagesAsRead(orderId, user.id)
+                unreadCount = 0
+                updateTitle(0)
+              }
+            } else if (document.hasFocus()) {
+              await markMessagesAsRead(orderId, user.id)
+            }
+          }
+        )
+        
+        // Добавляем обработчик печати
+        channel.on('broadcast', { event: 'typing' }, (payload) => {
+          if (isSubscribed) {
+            setTypingUser(payload.payload.user)
+            clearTimeout(typingTimeoutRef.current)
+            typingTimeoutRef.current = setTimeout(() => {
+              if (isSubscribed) setTypingUser(null)
+            }, 1500)
+          }
+        })
+        
+        // ПОСЛЕ добавления всех обработчиков - подписываемся
+        channel.subscribe((status) => {
+          console.log('Channel status:', status)
+          if (status === 'SUBSCRIBED') {
+            console.log('Successfully subscribed to channel')
+          }
+        })
+        
+        channelRef.current = channel
+      } catch (error) {
+        console.error('Error setting up realtime:', error)
+      }
+    }
 
+    // Загружаем сообщения и настраиваем realtime
+    loadMessages()
+    setupRealtime()
+
+    // Сброс счетчика при фокусе на окне
+    const handleFocus = async () => {
+      if (unreadCount > 0) {
+        unreadCount = 0
+        updateTitle(0)
+        await markMessagesAsRead(orderId, user.id)
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    
     return () => {
       isSubscribed = false
       if (channelRef.current) {
@@ -186,6 +197,7 @@ export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) 
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current)
       }
+      window.removeEventListener('focus', handleFocus)
     }
   }, [user, orderId])
 

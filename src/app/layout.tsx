@@ -36,6 +36,25 @@ export default function RootLayout({
             `,
           }}
         />
+
+          <script
+    dangerouslySetInnerHTML={{
+      __html: `
+        // Автоматическое разрешение аудио при первом взаимодействии
+        document.addEventListener('click', function initAudio() {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            const audioContext = new AudioContext();
+            if (audioContext.state === 'suspended') {
+              audioContext.resume();
+            }
+          }
+          document.removeEventListener('click', initAudio);
+        });
+      `,
+    }}
+  />
+  
       </head>
       <body className={inter.className}>
         <ThemeProvider>
