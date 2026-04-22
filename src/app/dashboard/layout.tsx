@@ -8,6 +8,7 @@ import { LogOut, User, Menu, X, Sun, Moon, LayoutDashboard, ClipboardList, Users
 import Link from 'next/link'
 import { useUnreadMessages } from '@/hooks/useUnreadMessages'
 import { NotificationSound } from '@/components/NotificationSound'
+import { GlobalNotifications } from '@/components/GlobalNotifications'
 
 type Role = 'admin' | 'cleaner'
 
@@ -96,7 +97,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       
       {/* Компонент для звуковых уведомлений */}
-      <NotificationSound />
+
+<GlobalNotifications />
+<NotificationSound />
 
       {/* Top Navbar */}
       <nav className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 sticky top-0 z-40">
