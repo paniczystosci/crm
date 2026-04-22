@@ -4,7 +4,9 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
-import { Calendar, Clock, User, DollarSign, Package, Filter, ChevronRight, AlertCircle } from 'lucide-react'
+import { Calendar, Clock, User, DollarSign, Package, Filter, ChevronRight } from 'lucide-react'
+import { UnreadBadge } from '@/components/UnreadBadge'
+import { getUnreadCount } from '@/lib/supabase/markMessagesAsRead'
 
 type Order = {
   id: string
@@ -46,10 +48,16 @@ export default function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([])
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [loading, setLoading] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
 
   const supabase = createClient()
 
   useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUserId(user?.id || null)
+    }
+    getUser()
     fetchOrders()
   }, [filterStatus])
 
@@ -101,7 +109,6 @@ export default function AdminOrders() {
               </p>
             </div>
             
-            {/* Stats mini */}
             <div className="flex items-center gap-3 px-4 py-2 bg-white dark:bg-gray-800 rounded-2xl shadow-md">
               <div className="text-center">
                 <div className="text-2xl font-bold text-gray-900 dark:text-white">{orders.length}</div>
@@ -186,7 +193,9 @@ export default function AdminOrders() {
                 className="group block animate-in slide-in-from-bottom-4 duration-500"
                 style={{ animationDelay: `${idx * 50}ms` }}
               >
-                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5">
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 relative">
+                  <UnreadBadge orderId={order.id} userId={userId || undefined} />
+                  
                   <div className="flex flex-col lg:flex-row lg:items-center gap-6">
                     
                     {/* Основная информация */}
@@ -264,7 +273,7 @@ export default function AdminOrders() {
 
         {/* Footer Note */}
         <div className="mt-12 text-center text-xs text-gray-400 dark:text-gray-600">
-          <p>© 2026 Управление клинингом • Система управления заказами</p>
+          <p>© 2024 Управление клинингом • Система управления заказами</p>
         </div>
       </div>
     </div>

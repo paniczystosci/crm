@@ -1,4 +1,4 @@
-// src/components/OrderChat.tsx (альтернативная версия)
+// src/components/OrderChat.tsx
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
@@ -7,7 +7,8 @@ import { MessageBubble } from './chat/MessageBubble'
 import { MessageGroup } from './chat/MessageGroup'
 import { TypingIndicator } from './chat/TypingIndicator'
 import { ChatInput } from './chat/ChatInput'
-import { subscribeToMessages } from '@/lib/supabase/subscribeToMessages'
+import { markMessagesAsRead } from '@/lib/supabase/markMessagesAsRead'
+import { playNotificationSound } from '@/lib/supabase/playNotificationSound'
 import { MessageCircle, Users } from 'lucide-react'
 
 type OrderChatProps = {
@@ -24,12 +25,22 @@ export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) 
 
   const typingTimeoutRef = useRef<any>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const channelRef = useRef<any>(null)
+  const originalTitleRef = useRef<string>('')
 
   const scrollToBottom = () => {
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, 100)
   }
+
+  // Сохраняем оригинальный заголовок
+  useEffect(() => {
+    originalTitleRef.current = document.title
+    return () => {
+      document.title = originalTitleRef.current
+    }
+  }, [])
 
   // Загружаем пользователя
   useEffect(() => {
@@ -41,43 +52,137 @@ export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) 
     loadUser()
   }, [])
 
+  // Отметить сообщения как прочитанные при открытии чата
+  useEffect(() => {
+    if (!user || !orderId) return
+    
+    const markAsRead = async () => {
+      await markMessagesAsRead(orderId, user.id)
+    }
+    
+    markAsRead()
+    
+    // Интервал для обновления статуса (пока чат открыт)
+    const interval = setInterval(() => {
+      if (document.hasFocus()) {
+        markMessagesAsRead(orderId, user.id)
+      }
+    }, 5000)
+    
+    return () => clearInterval(interval)
+  }, [user, orderId])
+
+  // Функция для обновления заголовка
+  const updateTitle = (count: number) => {
+    if (count > 0 && !document.hasFocus()) {
+      document.title = `📩 (${count}) Новое сообщение - ${originalTitleRef.current}`
+    } else {
+      document.title = originalTitleRef.current
+    }
+  }
+
   // Загружаем сообщения и подписываемся на realtime
   useEffect(() => {
     if (!user || !orderId) return
 
-    // Загружаем историю сообщений
-    const loadMessages = async () => {
-      const { data: existingMessages, error } = await supabase
-        .from('order_messages')
-        .select('*')
-        .eq('order_id', orderId)
-        .order('created_at', { ascending: true })
+    let isSubscribed = true
+    let unreadCount = 0
 
-      if (!error && existingMessages) {
-        setMessages(existingMessages)
-        scrollToBottom()
+    const initChat = async () => {
+      try {
+        // Загружаем историю сообщений
+        const { data: existingMessages, error } = await supabase
+          .from('order_messages')
+          .select('*')
+          .eq('order_id', orderId)
+          .order('created_at', { ascending: true })
+
+        if (!error && existingMessages && isSubscribed) {
+          setMessages(existingMessages)
+          scrollToBottom()
+        }
+
+        const channel = supabase
+          .channel(`order-messages-${orderId}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'order_messages',
+              filter: `order_id=eq.${orderId}`,
+            },
+            async (payload) => {
+              if (!isSubscribed) return
+              
+              // Добавляем новое сообщение
+              setMessages(prev => [...prev, payload.new])
+              scrollToBottom()
+              
+              // Если сообщение не от текущего пользователя
+              if (payload.new.user_id !== user.id) {
+                // Воспроизводим звук
+                playNotificationSound()
+                
+                // Увеличиваем счетчик непрочитанных
+                unreadCount++
+                updateTitle(unreadCount)
+                
+                // Отмечаем как прочитанное если чат активен
+                if (document.hasFocus()) {
+                  await markMessagesAsRead(orderId, user.id)
+                  unreadCount = 0
+                  updateTitle(0)
+                }
+              } else if (document.hasFocus()) {
+                // Если сообщение от пользователя и чат в фокусе
+                await markMessagesAsRead(orderId, user.id)
+              }
+            }
+          )
+          .on('broadcast', { event: 'typing' }, (payload) => {
+            if (isSubscribed) {
+              setTypingUser(payload.payload.user)
+              clearTimeout(typingTimeoutRef.current)
+              typingTimeoutRef.current = setTimeout(() => {
+                if (isSubscribed) setTypingUser(null)
+              }, 1500)
+            }
+          })
+
+        channel.subscribe((status) => {
+          console.log('Channel status:', status)
+        })
+
+        channelRef.current = channel
+
+        // Сброс счетчика при фокусе на окне
+        const handleFocus = async () => {
+          if (unreadCount > 0) {
+            unreadCount = 0
+            updateTitle(0)
+            await markMessagesAsRead(orderId, user.id)
+          }
+        }
+
+        window.addEventListener('focus', handleFocus)
+        
+        return () => {
+          window.removeEventListener('focus', handleFocus)
+        }
+
+      } catch (error) {
+        console.error('Error initializing chat:', error)
       }
     }
 
-    loadMessages()
-
-    // Подписываемся на новые сообщения
-    const unsubscribe = subscribeToMessages({
-      supabase,
-      orderId,
-      onMessage: (msg) => {
-        setMessages(prev => [...prev, msg])
-        scrollToBottom()
-      },
-      onTyping: (payload) => {
-        setTypingUser(payload.user)
-        clearTimeout(typingTimeoutRef.current)
-        typingTimeoutRef.current = setTimeout(() => setTypingUser(null), 1500)
-      }
-    })
+    initChat()
 
     return () => {
-      unsubscribe()
+      isSubscribed = false
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+      }
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current)
       }

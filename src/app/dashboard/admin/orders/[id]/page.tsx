@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useParams, useRouter } from 'next/navigation'
 import OrderChat from '@/components/OrderChat'
-import { Calendar, MapPin, Phone, DollarSign, ExternalLink, User, Clock, MessageSquare, Edit3, ArrowLeft, Save, X } from 'lucide-react'
+import { Calendar, MapPin, Phone, DollarSign, ExternalLink, ArrowLeft, Clock, User, Edit3, Save, X } from 'lucide-react'
 import Link from 'next/link'
 
 type Order = any
@@ -358,22 +358,12 @@ export default function AdminOrderDetail() {
           </div>
 
           {/* Чат */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
-              <h2 className="font-semibold text-lg flex items-center gap-2">
-                <MessageSquare size={20} className="text-blue-500" />
-                Чат с клинером
-              </h2>
-            </div>
-            <div className="h-[500px]">
-              <OrderChat orderId={id} isAdmin={true} />
-            </div>
-          </div>
+          <OrderChat orderId={id} isAdmin={true} />
         </div>
 
         {/* Footer Note */}
         <div className="mt-12 text-center text-xs text-gray-400 dark:text-gray-600">
-          <p>© 2026 Управление клинингом • Детали заказа #{id.slice(0, 8).toUpperCase()}</p>
+          <p>© 2024 Управление клинингом • Детали заказа #{id.slice(0, 8).toUpperCase()}</p>
         </div>
       </div>
     </div>

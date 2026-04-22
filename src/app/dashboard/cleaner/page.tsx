@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Calendar, MapPin, Phone, ArrowRight, Plus, Filter, Clock, User, DollarSign, AlertCircle } from 'lucide-react'
+import { UnreadBadge } from '@/components/UnreadBadge'
+import { getUnreadCount } from '@/lib/supabase/markMessagesAsRead'
 
 type Order = {
   id: string
@@ -48,11 +50,17 @@ export default function CleanerOrders() {
   const [filter, setFilter] = useState<Order['status'] | 'all'>('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
 
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUserId(user?.id || null)
+    }
+    getUser()
     fetchOrders()
   }, [filter])
 
@@ -275,10 +283,11 @@ export default function CleanerOrders() {
             <Link
               key={order.id}
               href={`/dashboard/cleaner/orders/${order.id}`}
-              className="group animate-in slide-in-from-bottom-4 duration-500"
+              className="group animate-in slide-in-from-bottom-4 duration-500 relative"
               style={{ animationDelay: `${idx * 50}ms` }}
             >
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 relative">
+                <UnreadBadge orderId={order.id} userId={userId || undefined} />
                 
                 {/* Header */}
                 <div className="p-5 pb-3 border-b border-gray-100 dark:border-gray-700">
