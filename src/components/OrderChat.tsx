@@ -1,4 +1,4 @@
-// src/components/OrderChat.tsx
+// src/components/OrderChat.tsx (альтернативная версия)
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
@@ -24,7 +24,6 @@ export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) 
 
   const typingTimeoutRef = useRef<any>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const channelRef = useRef<any>(null)
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -46,66 +45,39 @@ export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) 
   useEffect(() => {
     if (!user || !orderId) return
 
-    let isSubscribed = true
+    // Загружаем историю сообщений
+    const loadMessages = async () => {
+      const { data: existingMessages, error } = await supabase
+        .from('order_messages')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: true })
 
-    const initChat = async () => {
-      try {
-        // Загружаем историю сообщений
-        const { data: existingMessages, error } = await supabase
-          .from('order_messages')
-          .select('*')
-          .eq('order_id', orderId)
-          .order('created_at', { ascending: true })
-
-        if (!error && existingMessages && isSubscribed) {
-          setMessages(existingMessages)
-          scrollToBottom()
-        }
-
-        // Подписываемся на новые сообщения
-        const channel = supabase
-          .channel(`order-messages-${orderId}`)
-          .on(
-            'postgres_changes',
-            {
-              event: 'INSERT',
-              schema: 'public',
-              table: 'order_messages',
-              filter: `order_id=eq.${orderId}`,
-            },
-            (payload) => {
-              console.log('New message:', payload.new)
-              if (isSubscribed) {
-                setMessages(prev => [...prev, payload.new])
-                scrollToBottom()
-              }
-            }
-          )
-          .on('broadcast', { event: 'typing' }, (payload) => {
-            if (isSubscribed) {
-              setTypingUser(payload.payload.user)
-              clearTimeout(typingTimeoutRef.current)
-              typingTimeoutRef.current = setTimeout(() => {
-                if (isSubscribed) setTypingUser(null)
-              }, 1500)
-            }
-          })
-          .subscribe()
-
-        channelRef.current = channel
-
-      } catch (error) {
-        console.error('Error initializing chat:', error)
+      if (!error && existingMessages) {
+        setMessages(existingMessages)
+        scrollToBottom()
       }
     }
 
-    initChat()
+    loadMessages()
+
+    // Подписываемся на новые сообщения
+    const unsubscribe = subscribeToMessages({
+      supabase,
+      orderId,
+      onMessage: (msg) => {
+        setMessages(prev => [...prev, msg])
+        scrollToBottom()
+      },
+      onTyping: (payload) => {
+        setTypingUser(payload.user)
+        clearTimeout(typingTimeoutRef.current)
+        typingTimeoutRef.current = setTimeout(() => setTypingUser(null), 1500)
+      }
+    })
 
     return () => {
-      isSubscribed = false
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current)
-      }
+      unsubscribe()
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current)
       }

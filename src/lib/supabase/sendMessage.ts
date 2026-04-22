@@ -14,28 +14,42 @@ export async function sendMessage(
 
     // Если есть файл, загружаем его в Storage
     if (file) {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${Date.now()}.${fileExt}`
-      const filePath = `chat-images/${orderId}/${fileName}`
+      try {
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${Date.now()}.${fileExt}`
+        const filePath = `chat-images/${orderId}/${fileName}`
 
-      const { error: uploadError } = await supabase.storage
-        .from('chat-images')
-        .upload(filePath, file)
+        // Проверяем существует ли bucket
+        const { data: buckets } = await supabase.storage.listBuckets()
+        const bucketExists = buckets?.some(b => b.name === 'chat-images')
+        
+        if (!bucketExists) {
+          console.error('Bucket "chat-images" does not exist')
+          throw new Error('Storage bucket not configured')
+        }
 
-      if (uploadError) {
-        console.error('Error uploading image:', uploadError)
-        throw uploadError
+        const { error: uploadError } = await supabase.storage
+          .from('chat-images')
+          .upload(filePath, file)
+
+        if (uploadError) {
+          console.error('Error uploading image:', uploadError)
+          throw uploadError
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('chat-images')
+          .getPublicUrl(filePath)
+
+        image_url = publicUrl
+      } catch (uploadErr) {
+        console.error('Upload failed:', uploadErr)
+        throw new Error('Failed to upload image')
       }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('chat-images')
-        .getPublicUrl(filePath)
-
-      image_url = publicUrl
     }
 
     // Сохраняем сообщение в базу
-    const { error: insertError } = await supabase
+    const { data, error: insertError } = await supabase
       .from('order_messages')
       .insert({
         order_id: orderId,
@@ -44,13 +58,15 @@ export async function sendMessage(
         image_url: image_url,
         created_at: new Date().toISOString()
       })
+      .select()
 
     if (insertError) {
-      console.error('Error sending message:', insertError)
+      console.error('Error inserting message:', insertError)
       throw insertError
     }
 
-    return { success: true }
+    console.log('Message sent successfully:', data)
+    return { success: true, data }
   } catch (error) {
     console.error('Error in sendMessage:', error)
     return { success: false, error }
