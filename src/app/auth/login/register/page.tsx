@@ -1,11 +1,11 @@
 // src/app/(auth)/register/page.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Loader2 } from 'lucide-react'
+import { Loader2, User, Mail, Lock, Sparkles, CheckCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react'
 
 export default function RegisterPage() {
   const [fullName, setFullName] = useState('')
@@ -13,16 +13,25 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
+  const [focusedField, setFocusedField] = useState<string | null>(null)
 
   const router = useRouter()
   const supabase = createClient()
+
+  // Убираем скролл на body при монтировании
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = 'auto'
+    }
+  }, [])
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
-    // 1. Регистрация в Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -37,14 +46,13 @@ export default function RegisterPage() {
       return
     }
 
-    // 2. Создаём профиль (если email подтверждён или сразу)
     if (authData.user) {
       const { error: profileError } = await supabase
         .from('profiles')
         .insert({
           id: authData.user.id,
           full_name: fullName,
-          role: 'cleaner', // по умолчанию
+          role: 'cleaner',
         })
 
       if (profileError) {
@@ -57,67 +65,175 @@ export default function RegisterPage() {
     setLoading(false)
   }
 
+  const InputField = ({ 
+    label, 
+    name, 
+    type = 'text', 
+    required = false,
+    icon: Icon,
+    placeholder = ''
+  }: { 
+    label: string
+    name: string
+    type?: string
+    required?: boolean
+    icon: React.ElementType
+    placeholder?: string
+  }) => (
+    <div className="relative">
+      <div className={`absolute left-4 top-1/2 -translate-y-1/2 transition-all duration-200 ${
+        focusedField === name ? 'text-emerald-500' : 'text-gray-400'
+      }`}>
+        <Icon size={18} />
+      </div>
+      <input
+        type={type}
+        name={name}
+        required={required}
+        value={name === 'fullName' ? fullName : name === 'email' ? email : password}
+        onChange={(e) => {
+          if (name === 'fullName') setFullName(e.target.value)
+          else if (name === 'email') setEmail(e.target.value)
+          else setPassword(e.target.value)
+        }}
+        onFocus={() => setFocusedField(name)}
+        onBlur={() => setFocusedField(null)}
+        className="w-full pl-11 pr-4 py-3.5 text-base bg-gray-50 dark:bg-gray-900 border-2 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all duration-200"
+        style={{
+          borderColor: focusedField === name ? '#10b981' : '#e5e7eb'
+        }}
+        placeholder={placeholder}
+      />
+      <label className={`absolute left-11 -top-2.5 px-2 text-xs transition-all duration-200 bg-white dark:bg-gray-800 rounded-full ${
+        focusedField === name || 
+        (name === 'fullName' && fullName) || 
+        (name === 'email' && email) || 
+        (name === 'password' && password)
+          ? 'text-emerald-500 -translate-y-0' 
+          : 'text-gray-400 translate-y-0 opacity-0'
+      }`}>
+        {label}
+      </label>
+      {name === 'password' && (
+        <button
+          type="button"
+          onClick={() => setShowPassword(!showPassword)}
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+      )}
+    </div>
+  )
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-100 dark:bg-zinc-950 p-4">
-      <div className="card w-full max-w-md p-8">
+    <div className="fixed inset-0 bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 flex items-center justify-center p-4 overflow-y-auto">
+      
+      {/* Декоративные элементы */}
+      <div className="fixed top-0 left-0 w-72 h-72 bg-white/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
+      <div className="fixed bottom-0 right-0 w-72 h-72 bg-white/10 rounded-full blur-3xl translate-x-1/2 translate-y-1/2 pointer-events-none"></div>
+      <div className="fixed top-1/2 left-1/2 w-96 h-96 bg-emerald-300/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
+      
+      {/* Основная карточка */}
+      <div className="relative w-full max-w-md animate-in slide-in-from-bottom-8 duration-500 my-8">
+        
+        {/* Логотип и название */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-rose-600">Pani Czystości</h1>
-          <p className="text-zinc-600 dark:text-zinc-400 mt-2">Регистрация</p>
+          <div className="inline-flex p-4 bg-white/20 backdrop-blur-sm rounded-3xl mb-4 shadow-lg">
+            <Sparkles size={40} className="text-white" />
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">Pani Czystości</h1>
+          <p className="text-emerald-100 text-sm">Создайте новый аккаунт</p>
         </div>
 
-        <form onSubmit={handleRegister} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium mb-1">ФИО</label>
-            <input
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+        {/* Форма регистрации */}
+        <div className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-6 sm:p-8">
+          <form onSubmit={handleRegister} className="space-y-5">
+            
+            <InputField
+              label="ФИО"
+              name="fullName"
               required
-              className="w-full px-4 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 focus:outline-none focus:border-rose-500"
+              icon={User}
               placeholder="Иванова Анна Петровна"
             />
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
-            <input
+            <InputField
+              label="Email"
+              name="email"
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 focus:outline-none focus:border-rose-500"
+              icon={Mail}
+              placeholder="your@email.com"
             />
+
+            <InputField
+              label="Пароль"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              required
+              icon={Lock}
+              placeholder="••••••••"
+            />
+
+            {/* Подсказка о пароле */}
+            <p className="text-xs text-gray-500 mt-1">
+              Пароль должен содержать минимум 6 символов
+            </p>
+
+            {/* Ошибка */}
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-2xl animate-in shake duration-300">
+                <p className="text-red-600 text-sm text-center">{error}</p>
+              </div>
+            )}
+
+            {/* Кнопка регистрации */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all duration-200 transform active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 mt-6"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="animate-spin" size={20} />
+                  <span>Регистрация...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle size={18} />
+                  <span>Зарегистрироваться</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Разделитель */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200"></div>
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="px-3 bg-white text-gray-500">уже есть аккаунт?</span>
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Пароль</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              className="w-full px-4 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 focus:outline-none focus:border-rose-500"
-            />
-          </div>
-
-          {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-rose-600 hover:bg-rose-700 text-white py-3.5 rounded-2xl font-medium flex items-center justify-center gap-2 disabled:opacity-70"
+          {/* Ссылка на вход */}
+          <Link
+            href="/auth/login"
+            className="w-full flex items-center justify-center gap-2 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-200"
           >
-            {loading ? <Loader2 className="animate-spin" size={20} /> : 'Зарегистрироваться'}
-          </button>
-        </form>
-
-        <p className="text-center text-sm text-zinc-500 mt-6">
-          Уже есть аккаунт?{' '}
-          <Link href="/auth/login" className="text-rose-600 hover:underline">
-            Войти
+            <ArrowLeft size={16} />
+            <span>Войти в существующий аккаунт</span>
           </Link>
-        </p>
+
+          {/* Футер */}
+          <div className="mt-6 pt-4 border-t border-gray-100">
+            <p className="text-center text-xs text-gray-400">
+              © 2024 Pani Czystości. Все права защищены.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   )

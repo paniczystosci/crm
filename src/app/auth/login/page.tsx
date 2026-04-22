@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
-import { Eye, EyeOff, Mail, Lock, LogIn, Sparkles, CheckCircle, Fingerprint, Shield } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, LogIn, Sparkles, CheckCircle } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -18,6 +18,13 @@ export default function LoginPage() {
   const router = useRouter()
 
   const supabase = createClient()
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = 'auto'
+    }
+  }, [])
 
   useEffect(() => {
     const savedEmail = localStorage.getItem('remembered_email')
@@ -60,35 +67,35 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 flex items-center justify-center p-4 overflow-y-auto">
       
       {/* Декоративные элементы */}
-      <div className="absolute top-0 left-0 w-72 h-72 bg-white/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
-      <div className="absolute bottom-0 right-0 w-72 h-72 bg-white/10 rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
-      <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-emerald-300/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
+      <div className="fixed top-0 left-0 w-72 h-72 bg-white/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
+      <div className="fixed bottom-0 right-0 w-72 h-72 bg-white/10 rounded-full blur-3xl translate-x-1/2 translate-y-1/2 pointer-events-none"></div>
+      <div className="fixed top-1/2 left-1/2 w-96 h-96 bg-emerald-300/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
       
       {/* Основная карточка */}
-      <div className="relative w-full max-w-[400px] animate-in slide-in-from-bottom-8 duration-500">
+      <div className="relative w-full max-w-md animate-in slide-in-from-bottom-8 duration-500 my-8">
         
         {/* Логотип и название */}
         <div className="text-center mb-8">
           <div className="inline-flex p-4 bg-white/20 backdrop-blur-sm rounded-3xl mb-4 shadow-lg">
             <Sparkles size={40} className="text-white" />
           </div>
-          <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">Pani Czystości</h1>
-          <p className="text-emerald-100 text-sm">Добро пожаловать!</p>
+          <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">Pani Czystości</h1>
+          <p className="text-emerald-100 text-sm">Войдите в свою учетную запись</p>
         </div>
 
         {/* Форма входа */}
         <div className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-6 sm:p-8">
-          <form onSubmit={handleLogin} className="space-y-6">
+          <form onSubmit={handleLogin} className="space-y-5">
             
             {/* Email поле */}
             <div className="relative">
               <div className={`absolute left-4 top-1/2 -translate-y-1/2 transition-all duration-200 ${
                 emailFocused || email ? 'text-emerald-500' : 'text-gray-400'
               }`}>
-                <Mail size={20} />
+                <Mail size={18} />
               </div>
               <input
                 type="email"
@@ -97,13 +104,13 @@ export default function LoginPage() {
                 onFocus={() => setEmailFocused(true)}
                 onBlur={() => setEmailFocused(false)}
                 required
-                className="w-full pl-12 pr-4 py-4 text-base bg-gray-50 border-2 rounded-2xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all duration-200"
+                className="w-full pl-11 pr-4 py-3.5 text-base bg-white border-2 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all duration-200"
                 style={{
                   borderColor: emailFocused ? '#10b981' : '#e5e7eb',
                 }}
                 placeholder="Email"
               />
-              <label className={`absolute left-12 -top-2.5 px-2 text-xs transition-all duration-200 bg-white rounded-full ${
+              <label className={`absolute left-11 -top-2.5 px-2 text-xs transition-all duration-200 bg-white rounded-full ${
                 emailFocused || email ? 'text-emerald-500 -translate-y-0' : 'text-gray-400 translate-y-0 opacity-0'
               }`}>
                 Email
@@ -115,7 +122,7 @@ export default function LoginPage() {
               <div className={`absolute left-4 top-1/2 -translate-y-1/2 transition-all duration-200 ${
                 passwordFocused || password ? 'text-emerald-500' : 'text-gray-400'
               }`}>
-                <Lock size={20} />
+                <Lock size={18} />
               </div>
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -124,7 +131,7 @@ export default function LoginPage() {
                 onFocus={() => setPasswordFocused(true)}
                 onBlur={() => setPasswordFocused(false)}
                 required
-                className="w-full pl-12 pr-12 py-4 text-base bg-gray-50 border-2 rounded-2xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all duration-200"
+                className="w-full pl-11 pr-12 py-3.5 text-base bg-white border-2 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all duration-200"
                 style={{
                   borderColor: passwordFocused ? '#10b981' : '#e5e7eb',
                 }}
@@ -135,17 +142,17 @@ export default function LoginPage() {
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
               >
-                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
-              <label className={`absolute left-12 -top-2.5 px-2 text-xs transition-all duration-200 bg-white rounded-full ${
+              <label className={`absolute left-11 -top-2.5 px-2 text-xs transition-all duration-200 bg-white rounded-full ${
                 passwordFocused || password ? 'text-emerald-500 -translate-y-0' : 'text-gray-400 translate-y-0 opacity-0'
               }`}>
                 Пароль
               </label>
             </div>
 
-            {/* Запомнить меня и forgot password */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Запомнить меня */}
+            <div className="flex items-center">
               <label className="flex items-center gap-2 cursor-pointer group">
                 <div className="relative">
                   <input
@@ -166,13 +173,6 @@ export default function LoginPage() {
                   Запомнить меня
                 </span>
               </label>
-              
-              <button
-                type="button"
-                className="text-sm text-emerald-600 hover:text-emerald-700 transition-colors text-left sm:text-right"
-              >
-                Забыли пароль?
-              </button>
             </div>
 
             {/* Ошибка */}
@@ -186,7 +186,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-2xl transition-all duration-200 transform active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 text-base"
+              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all duration-200 transform active:scale-[0.98] shadow-lg flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -195,60 +195,17 @@ export default function LoginPage() {
                 </>
               ) : (
                 <>
-                  <LogIn size={20} />
+                  <LogIn size={18} />
                   <span>Войти</span>
                 </>
               )}
             </button>
-
-            {/* Быстрый вход через demo */}
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200"></div>
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="px-3 bg-white text-gray-500">или</span>
-              </div>
-            </div>
-
-            {/* Демо-кнопки */}
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('admin@example.com')
-                  setPassword('123456')
-                }}
-                className="py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-              >
-                <Shield size={16} />
-                Админ
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('cleaner@example.com')
-                  setPassword('123456')
-                }}
-                className="py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-              >
-                <Fingerprint size={16} />
-                Клинер
-              </button>
-            </div>
-
-            {/* Доп. информация */}
-            <div className="text-center">
-              <p className="text-xs text-gray-500">
-                Пароль для всех demo: <span className="font-mono font-semibold">123456</span>
-              </p>
-            </div>
           </form>
 
           {/* Футер */}
           <div className="mt-8 pt-6 border-t border-gray-100">
             <p className="text-center text-xs text-gray-400">
-              © 2024 Pani Czystości. Все права защищены.
+              © 2026 Pani Czystości. Все права защищены.
             </p>
           </div>
         </div>

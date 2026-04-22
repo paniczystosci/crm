@@ -400,7 +400,7 @@ export default function AdminStats() {
 
         {/* Footer Note */}
         <div className="text-center text-xs text-gray-400 dark:text-gray-600">
-          <p>© 2024 Управление клинингом • Аналитика и отчёты</p>
+          <p>© 2026 Управление клинингом • Аналитика и отчёты</p>
         </div>
       </div>
     </div>

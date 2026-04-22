@@ -260,7 +260,7 @@ export default function AdminDashboard() {
 
         {/* Footer Note */}
         <div className="mt-12 text-center text-xs text-gray-400 dark:text-gray-600">
-          <p>© 2024 Управление клинингом • Все данные обновлены</p>
+          <p>© 2026 Управление клинингом • Все данные обновлены</p>
         </div>
       </div>
     </div>

@@ -398,7 +398,7 @@ export default function AdminPayments() {
 
         {/* Footer Note */}
         <div className="mt-12 text-center text-xs text-gray-400 dark:text-gray-600">
-          <p>© 2024 Управление клинингом • Система выплат клинерам</p>
+          <p>© 2026 Управление клинингом • Система выплат клинерам</p>
         </div>
       </div>
     </div>

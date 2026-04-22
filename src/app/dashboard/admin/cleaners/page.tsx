@@ -401,7 +401,7 @@ export default function AdminCleaners() {
 
         {/* Footer Note */}
         <div className="mt-12 text-center text-xs text-gray-400 dark:text-gray-600">
-          <p>© 2024 Управление клинингом • Система управления сотрудниками</p>
+          <p>© 2026 Управление клинингом • Система управления сотрудниками</p>
         </div>
       </div>
     </div>

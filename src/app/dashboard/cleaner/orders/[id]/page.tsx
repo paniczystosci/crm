@@ -14,7 +14,6 @@ import {
   ArrowLeft, 
   Clock, 
   User,
-  MessageSquare,
   CheckCircle,
   Clock as ClockIcon,
   Sparkles,
@@ -277,22 +276,22 @@ export default function CleanerOrderDetail() {
         </div>
 
         {/* Order Details */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="p-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-black-700 overflow-hidden">
+          <div className="p-5 border-b border-gray-200 dark:border-black-700 bg-gradient-to-r from-gray-50 to-white dark:from-black-800 dark:to-black-800">
             <h2 className="font-semibold text-lg flex items-center gap-2">
               <DollarSign size={20} className="text-emerald-500" />
               Детали заказа
             </h2>
           </div>
           <div className="p-5 space-y-4">
-            <div className="flex justify-between items-center pb-3 border-b border-gray-100 dark:border-gray-700">
-              <span className="text-gray-500">Сумма</span>
+            <div className="flex justify-between items-center pb-3 border-b border-gray-100 dark:border-black-700">
+              <span className="text-black-500">Сумма</span>
               <span className="font-bold text-2xl text-emerald-600 dark:text-emerald-400">{order.price} zł</span>
             </div>
             {order.planned_date && (
               <div className="flex justify-between items-center">
                 <span className="text-gray-500">Дата и время</span>
-                <span className="font-medium flex items-center gap-2">
+                <span className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
                   <Calendar size={16} className="text-gray-400" />
                   {new Date(order.planned_date).toLocaleDateString('ru-RU')}
                   {order.planned_time && (
@@ -459,21 +458,13 @@ export default function CleanerOrderDetail() {
       )}
 
       {/* Chat Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div className="p-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
-          <h2 className="font-semibold text-lg flex items-center gap-2">
-            <MessageSquare size={20} className="text-blue-500" />
-            Чат с администратором
-          </h2>
-        </div>
-        <div className="h-[450px]">
-          <OrderChat orderId={id} isAdmin={false} />
-        </div>
+      <div className="mt-8">
+        <OrderChat orderId={id} isAdmin={false} />
       </div>
 
       {/* Footer Note */}
       <div className="mt-8 text-center text-xs text-gray-400 dark:text-gray-600">
-        <p>© 2024 Управление клинингом • Заказ #{order.id.slice(0, 8).toUpperCase()}</p>
+        <p>© 2026 Управление клинингом • Заказ #{order.id.slice(0, 8).toUpperCase()}</p>
       </div>
     </div>
   )

@@ -200,24 +200,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Sidebar Footer */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-800 space-y-2 bg-white dark:bg-gray-900">
-          <button
-            onClick={toggleTheme}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
-          >
-            <div className="flex items-center gap-3">
-              {isDark ? (
-                <Sun size={20} className="text-amber-500" />
-              ) : (
-                <Moon size={20} className="text-gray-500" />
-              )}
-              <span className="text-gray-700 dark:text-gray-300">
-                {isDark ? 'Светлая тема' : 'Тёмная тема'}
-              </span>
-            </div>
-            <span className="text-xs text-gray-400">
-              {isDark ? '🌙 → ☀️' : '☀️ → 🌙'}
-            </span>
-          </button>
+
 
           <button
             onClick={handleLogout}
@@ -230,7 +213,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </button>
 
           <div className="px-4 pt-4 text-center">
-            <p className="text-xs text-gray-400">© 2024 Pani Czystości</p>
+            <p className="text-xs text-gray-400">© 2026 Pani Czystości</p>
             <p className="text-xs text-gray-400 mt-0.5">Версия 2.0.0</p>
           </div>
         </div>

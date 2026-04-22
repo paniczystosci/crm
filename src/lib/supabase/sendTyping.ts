@@ -1,11 +1,14 @@
+// src/lib/supabase/sendTyping.ts
 import { createClient } from '@/lib/supabase'
 
-export function sendTyping(orderId: string, user: string) {
+export async function sendTyping(orderId: string, userName: string) {
   const supabase = createClient()
-
-  supabase.channel(`order_chat_${orderId}`).send({
+  
+  const channel = supabase.channel(`order_messages:${orderId}`)
+  
+  await channel.send({
     type: 'broadcast',
     event: 'typing',
-    payload: { user }
+    payload: { user: userName }
   })
 }
