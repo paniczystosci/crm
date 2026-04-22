@@ -1,0 +1,7 @@
+/* src/app/theme.css - если хотите кастомные цвета */
+@theme {
+  --color-primary: #10b981;
+  --color-primary-dark: #059669;
+  --color-secondary: #14b8a6;
+  --color-accent: #f59e0b;
+}

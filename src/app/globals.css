@@ -1,9 +1,4 @@
-/* Подсказка редактору, что это PostCSS */
-@supports (color: oklch(0% 0 0)) {
-  /* ничего, просто хак для VS Code */
-}
-
-/* Tailwind v4 */
+/* src/app/globals.css */
 @import "tailwindcss";
 
 /* CSS-переменные */
@@ -12,20 +7,10 @@
   --foreground: #171717;
 }
 
-/* Tailwind v4 тема */
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-/* Тёмная тема */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Тёмная тема через класс */
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 /* Базовые стили */
@@ -35,51 +20,55 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Tailwind слои */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* Улучшение типографики */
-@layer base {
-  body {
-    font-feature-settings: "rlig" 1, "calt" 1;
-  }
+/* Кастомные компоненты через CSS (вместо @apply) */
+.card {
+  background-color: white;
+  border: 1px solid #e4e4e7;
+  border-radius: 1rem;
+  transition: all 0.3s ease;
 }
 
-/* Карточки */
-@layer components {
-  .card {
-    @apply bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm transition-all duration-300;
-  }
+.dark .card {
+  background-color: #18181b;
+  border-color: #27272a;
+}
 
-  .card:hover {
-    transform: translateY(-2px);
-    box-shadow:
-      0 20px 25px -5px rgb(0 0 0 / 0.1),
-      0 8px 10px -6px rgb(0 0 0 / 0.1);
-  }
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+}
 
-  /* Кнопки */
-  .btn-primary {
-    @apply bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-medium px-6 py-3 rounded-2xl transition-all active:scale-[0.985];
-  }
+/* Кнопки */
+.btn-primary {
+  background-color: #10b981;
+  color: white;
+  font-weight: 500;
+  padding: 0.75rem 1.5rem;
+  border-radius: 1rem;
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+  background-color: #059669;
+}
+
+.btn-primary:active {
+  transform: scale(0.985);
 }
 
 /* Инпуты */
-@layer utilities {
-  input,
-  select,
-  textarea {
-    transition: all 0.2s ease;
-  }
+input,
+select,
+textarea {
+  transition: all 0.2s ease;
+}
 
-  input:focus,
-  select:focus,
-  textarea:focus {
-    box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.15);
-    border-color: #1de141;
-  }
+input:focus,
+select:focus,
+textarea:focus {
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+  border-color: #10b981;
+  outline: none;
 }
 
 /* Мобильные карточки */
@@ -87,4 +76,40 @@ body {
   .card {
     padding: 1.25rem;
   }
+}
+
+/* Утилиты для скрытия скролла (если нужно) */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* src/app/globals.css */
+@keyframes slide-in-from-bottom {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.animate-in {
+  animation: slide-in-from-bottom 0.5s ease-out;
+}
+
+.shake {
+  animation: shake 0.3s ease-in-out;
 }
