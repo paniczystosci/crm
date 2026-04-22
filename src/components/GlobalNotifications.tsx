@@ -21,7 +21,15 @@ export function GlobalNotifications() {
           return
         }
 
-        console.log('🔔 Setting up global notifications for user:', user.id)
+        // Получаем роль пользователя
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+
+        const isAdmin = profile?.role === 'admin'
+        console.log(`🔔 Setting up notifications for ${isAdmin ? 'admin' : 'cleaner'}:`, user.id)
 
         // Создаем канал
         const channel = supabase.channel('global-notifications')
@@ -56,8 +64,11 @@ export function GlobalNotifications() {
                 .eq('id', payload.new.order_id)
                 .single()
               
-              new Notification('Новое сообщение в чате', {
-                body: `Заказ: ${order?.client_name || payload.new.order_id.slice(0, 8)}\n${payload.new.message?.slice(0, 100) || 'Новое сообщение'}`,
+              const notificationTitle = isAdmin ? 'Новое сообщение в чате' : 'Новое сообщение от администратора'
+              const notificationBody = `Заказ: ${order?.client_name || payload.new.order_id.slice(0, 8)}\n${payload.new.message?.slice(0, 100) || 'Новое сообщение'}`
+              
+              new Notification(notificationTitle, {
+                body: notificationBody,
                 icon: '/logo.png',
                 tag: `order-${payload.new.order_id}`,
               })

@@ -24,6 +24,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname()
   const supabase = createClient()
 
+    // В layout.tsx, в компоненте DashboardLayout, добавьте:
+
+useEffect(() => {
+  // Обновляем счетчик при переходе на страницу заказов
+  if (pathname.includes('/orders')) {
+    const event = new CustomEvent('refresh-unread')
+    window.dispatchEvent(event)
+  }
+}, [pathname])
+
   useEffect(() => {
     async function loadUser() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -92,6 +102,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   ]
 
   const navItems = isAdmin ? adminNavItems : cleanerNavItems
+
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">

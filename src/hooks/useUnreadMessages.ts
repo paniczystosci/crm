@@ -21,20 +21,48 @@ export function useUnreadMessages() {
         return
       }
 
-      // Получаем все заказы пользователя (как клинера)
-      const { data: orders, error: ordersError } = await supabase
-        .from('orders')
-        .select('id')
-        .eq('cleaner_id', user.id)
+      // Получаем роль пользователя
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
 
-      if (ordersError) {
-        console.error('Error fetching orders:', ordersError)
-        setTotalUnread(0)
-        setLoading(false)
-        return
+      const isAdmin = profile?.role === 'admin'
+      console.log(`👤 User role: ${isAdmin ? 'admin' : 'cleaner'}`)
+
+      let orders: any[] = []
+
+      if (isAdmin) {
+        // Админ: получаем ВСЕ заказы
+        const { data: allOrders, error: ordersError } = await supabase
+          .from('orders')
+          .select('id')
+
+        if (ordersError) {
+          console.error('Error fetching orders for admin:', ordersError)
+          setTotalUnread(0)
+          setLoading(false)
+          return
+        }
+        orders = allOrders || []
+        console.log(`📦 Admin: found ${orders.length} total orders`)
+      } else {
+        // Клинер: получаем только свои заказы
+        const { data: cleanerOrders, error: ordersError } = await supabase
+          .from('orders')
+          .select('id')
+          .eq('cleaner_id', user.id)
+
+        if (ordersError) {
+          console.error('Error fetching orders for cleaner:', ordersError)
+          setTotalUnread(0)
+          setLoading(false)
+          return
+        }
+        orders = cleanerOrders || []
+        console.log(`📦 Cleaner: found ${orders.length} orders`)
       }
-
-      console.log(`📦 Found ${orders?.length || 0} orders`)
 
       if (!orders || orders.length === 0) {
         setTotalUnread(0)
@@ -45,7 +73,7 @@ export function useUnreadMessages() {
       // Получаем все непрочитанные сообщения
       let total = 0
       for (const order of orders) {
-        // Получаем последнее время прочтения
+        // Получаем последнее время прочтения для этого пользователя
         const { data: readData } = await supabase
           .from('order_chat_reads')
           .select('last_read_at')
@@ -55,7 +83,7 @@ export function useUnreadMessages() {
 
         const lastReadAt = readData?.last_read_at || new Date(0).toISOString()
 
-        // Считаем новые сообщения
+        // Считаем новые сообщения (не от текущего пользователя)
         const { count, error } = await supabase
           .from('order_messages')
           .select('*', { count: 'exact', head: true })
@@ -103,16 +131,26 @@ export function useUnreadMessages() {
     }
   }, [])
 
-  // В конце файла src/hooks/useUnreadMessages.ts добавьте:
+  // Обновляем при фокусе на окне
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log('Window focused, refreshing unread count...')
+      fetchUnreadCounts()
+    }
+    
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [])
 
+  // Слушаем событие обновления счетчика
 useEffect(() => {
-  const handleFocus = () => {
-    console.log('Window focused, refreshing unread count...')
+  const handleRefresh = () => {
+    console.log('🔄 Refresh unread event received')
     fetchUnreadCounts()
   }
   
-  window.addEventListener('focus', handleFocus)
-  return () => window.removeEventListener('focus', handleFocus)
+  window.addEventListener('refresh-unread', handleRefresh)
+  return () => window.removeEventListener('refresh-unread', handleRefresh)
 }, [])
 
   return { totalUnread, loading, refetch: fetchUnreadCounts }
