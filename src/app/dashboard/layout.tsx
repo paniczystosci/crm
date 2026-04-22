@@ -24,6 +24,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname()
   const supabase = createClient()
 
+  // В src/app/(dashboard)/layout.tsx, добавьте useEffect для проверки соединения:
+
+useEffect(() => {
+  // Проверяем соединение с Supabase Realtime
+  const checkConnection = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      console.log('✅ User authenticated, realtime should work')
+    }
+  }
+  checkConnection()
+}, [])
+
     // В layout.tsx, в компоненте DashboardLayout, добавьте:
 
 useEffect(() => {

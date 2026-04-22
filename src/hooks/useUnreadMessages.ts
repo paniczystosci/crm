@@ -1,7 +1,7 @@
 // src/hooks/useUnreadMessages.ts
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 
 export function useUnreadMessages() {
@@ -9,7 +9,7 @@ export function useUnreadMessages() {
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
-  const fetchUnreadCounts = async () => {
+  const fetchUnreadCounts = useCallback(async () => {
     try {
       console.log('🔄 Fetching unread counts...')
       
@@ -104,12 +104,15 @@ export function useUnreadMessages() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase])
 
+  // Первоначальная загрузка
   useEffect(() => {
     fetchUnreadCounts()
+  }, [fetchUnreadCounts])
 
-    // Подписка на новые сообщения
+  // Подписка на новые сообщения в реальном времени
+  useEffect(() => {
     const channel = supabase
       .channel('unread-updates')
       .on(
@@ -120,7 +123,7 @@ export function useUnreadMessages() {
           table: 'order_messages',
         },
         (payload) => {
-          console.log('📩 New message detected!', payload.new)
+          console.log('📩 New message detected for unread count!', payload.new)
           fetchUnreadCounts()
         }
       )
@@ -129,7 +132,7 @@ export function useUnreadMessages() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [supabase, fetchUnreadCounts])
 
   // Обновляем при фокусе на окне
   useEffect(() => {
@@ -140,18 +143,18 @@ export function useUnreadMessages() {
     
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
-  }, [])
+  }, [fetchUnreadCounts])
 
   // Слушаем событие обновления счетчика
-useEffect(() => {
-  const handleRefresh = () => {
-    console.log('🔄 Refresh unread event received')
-    fetchUnreadCounts()
-  }
-  
-  window.addEventListener('refresh-unread', handleRefresh)
-  return () => window.removeEventListener('refresh-unread', handleRefresh)
-}, [])
+  useEffect(() => {
+    const handleRefresh = () => {
+      console.log('🔄 Refresh unread event received')
+      fetchUnreadCounts()
+    }
+    
+    window.addEventListener('refresh-unread', handleRefresh)
+    return () => window.removeEventListener('refresh-unread', handleRefresh)
+  }, [fetchUnreadCounts])
 
   return { totalUnread, loading, refetch: fetchUnreadCounts }
 }
