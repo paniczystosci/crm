@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { LogOut, User, Menu, X, Sun, Moon, LayoutDashboard, ClipboardList, Users, BarChart3, DollarSign, Plus, Wallet, Bell } from 'lucide-react'
+import { LogOut, User, Menu, X, Sun, Moon, LayoutDashboard, ClipboardList, Users, BarChart3, DollarSign, Plus, Wallet, Bell, Settings } from 'lucide-react'
 import Link from 'next/link'
 import { useUnreadMessages } from '@/hooks/useUnreadMessages'
 import { NotificationSound } from '@/components/NotificationSound'
@@ -18,34 +18,42 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isDark, setIsDark] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
   const { totalUnread } = useUnreadMessages()
 
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
 
-  // В src/app/(dashboard)/layout.tsx, добавьте useEffect для проверки соединения:
-
-useEffect(() => {
-  // Проверяем соединение с Supabase Realtime
-  const checkConnection = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      console.log('✅ User authenticated, realtime should work')
+  // Закрывать меню при клике вне
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuOpen && !(e.target as Element).closest('.user-menu')) {
+        setUserMenuOpen(false)
+      }
     }
-  }
-  checkConnection()
-}, [])
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [userMenuOpen])
 
-    // В layout.tsx, в компоненте DashboardLayout, добавьте:
+  // Проверяем соединение с Supabase Realtime
+  useEffect(() => {
+    const checkConnection = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        console.log('✅ User authenticated, realtime should work')
+      }
+    }
+    checkConnection()
+  }, [])
 
-useEffect(() => {
   // Обновляем счетчик при переходе на страницу заказов
-  if (pathname.includes('/orders')) {
-    const event = new CustomEvent('refresh-unread')
-    window.dispatchEvent(event)
-  }
-}, [pathname])
+  useEffect(() => {
+    if (pathname.includes('/orders')) {
+      const event = new CustomEvent('refresh-unread')
+      window.dispatchEvent(event)
+    }
+  }, [pathname])
 
   useEffect(() => {
     async function loadUser() {
@@ -116,15 +124,12 @@ useEffect(() => {
 
   const navItems = isAdmin ? adminNavItems : cleanerNavItems
 
-
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       
       {/* Компонент для звуковых уведомлений */}
-
-<GlobalNotifications />
-<NotificationSound />
+      <GlobalNotifications />
+      <NotificationSound />
 
       {/* Top Navbar */}
       <nav className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 sticky top-0 z-40">
@@ -174,7 +179,7 @@ useEffect(() => {
               </button>
             </div>
 
-            {/* Кнопка переключения темы */}
+            {/* Кнопка переключения темы в топ-баре */}
             <button
               onClick={toggleTheme}
               className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
@@ -182,10 +187,52 @@ useEffect(() => {
               {isDark ? <Sun size={20} className="text-amber-500" /> : <Moon size={20} className="text-gray-700" />}
             </button>
 
-            <div className="md:hidden flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
-                <User size={14} className="text-white" />
-              </div>
+            {/* Выпадающее меню пользователя */}
+            <div className="relative user-menu">
+              <button
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className="flex items-center gap-2 p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-md">
+                  <User size={14} className="text-white" />
+                </div>
+                <span className="hidden md:block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {user?.email?.split('@')[0] || 'Профиль'}
+                </span>
+              </button>
+              
+              {userMenuOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                      {user?.email?.split('@')[0] || 'Пользователь'}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                      {user?.email}
+                    </p>
+                  </div>
+                  
+                  <Link
+                    href="/dashboard/settings"
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    onClick={() => {
+                      setUserMenuOpen(false)
+                      setSidebarOpen(false)
+                    }}
+                  >
+                    <Settings size={16} />
+                    <span>Настройки</span>
+                  </Link>
+                  
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors border-t border-gray-100 dark:border-gray-700 mt-1"
+                  >
+                    <LogOut size={16} />
+                    <span>Выйти из аккаунта</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -240,7 +287,7 @@ useEffect(() => {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto" style={{ height: 'calc(100% - 280px)' }}>
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto" style={{ height: 'calc(100% - 320px)' }}>
           {navItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
@@ -276,48 +323,45 @@ useEffect(() => {
               </Link>
             )
           })}
+
+          {/* Разделитель и ссылка на настройки в сайдбаре */}
+          <div className="pt-4 mt-2 border-t border-gray-200 dark:border-gray-700">
+            <Link
+              href="/dashboard/settings"
+              onClick={() => setSidebarOpen(false)}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
+                pathname === '/dashboard/settings'
+                  ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-md'
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+            >
+              <Settings size={20} className={pathname === '/dashboard/settings' ? 'text-white' : 'text-gray-500 group-hover:text-emerald-500'} />
+              <span className="font-medium flex-1">Настройки</span>
+              {pathname === '/dashboard/settings' && (
+                <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
+              )}
+            </Link>
+          </div>
         </nav>
 
-        {/* Sidebar Footer */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-800 space-y-2 bg-white dark:bg-gray-900">
-          
-          {/* Theme Toggle в сайдбаре */}
-          <button
-            onClick={toggleTheme}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
-          >
-            <div className="flex items-center gap-3">
-              {isDark ? (
-                <Sun size={20} className="text-amber-500" />
-              ) : (
-                <Moon size={20} className="text-gray-500" />
-              )}
-              <span className="text-gray-700 dark:text-gray-300">
-                {isDark ? 'Светлая тема' : 'Тёмная тема'}
-              </span>
-            </div>
-            <span className="text-xs text-gray-400">
-              {isDark ? '🌙 → ☀️' : '☀️ → 🌙'}
-            </span>
-          </button>
+{/* Sidebar Footer - только кнопка выхода */}
+<div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+  {/* Logout Button */}
+  <button
+    onClick={handleLogout}
+    className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white font-medium transition-all duration-200 transform active:scale-[0.98] shadow-md relative overflow-hidden group"
+  >
+    <div className="absolute inset-0 w-0 bg-white/20 transition-all duration-300 group-hover:w-full"></div>
+    <LogOut size={20} className="relative z-10" />
+    <span className="relative z-10">Выйти из аккаунта</span>
+  </button>
 
-          {/* Logout Button */}
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors group"
-          >
-            <LogOut size={20} className="text-red-500 group-hover:text-red-600" />
-            <span className="text-red-600 dark:text-red-400 font-medium">
-              Выйти из аккаунта
-            </span>
-          </button>
-
-          {/* Version */}
-          <div className="px-4 pt-4 text-center">
-            <p className="text-xs text-gray-400">© 2026 Pani Czystości</p>
-            <p className="text-xs text-gray-400 mt-0.5">Версия 2.0.0</p>
-          </div>
-        </div>
+  {/* Version */}
+  <div className="px-4 pt-4 text-center">
+    <p className="text-xs text-gray-400">© 2026 Pani Czystości</p>
+    <p className="text-xs text-gray-400 mt-0.5">Версия 2.0.0</p>
+  </div>
+</div>
       </div>
 
       {sidebarOpen && (

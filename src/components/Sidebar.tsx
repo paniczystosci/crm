@@ -15,8 +15,8 @@ import {
   X,
   Moon,
   Sun,
-  Bell,
-  MessageCircle
+  Settings,
+  UserCog
 } from 'lucide-react'
 import { useUnreadMessages } from '@/hooks/useUnreadMessages'
 
@@ -26,18 +26,18 @@ type SidebarProps = {
 }
 
 const adminNavItems = [
-  { href: '/dashboard/admin', label: 'Главная', icon: LayoutDashboard },
-  { href: '/dashboard/admin/orders', label: 'Заказы', icon: ClipboardList },
-  { href: '/dashboard/admin/cleaners', label: 'Клинеры', icon: Users },
-  { href: '/dashboard/admin/payments', label: 'Выплаты', icon: DollarSign },
-  { href: '/dashboard/admin/stats', label: 'Статистика', icon: BarChart3 },
+  { href: '/dashboard/admin', label: 'Главная', icon: LayoutDashboard, showNotification: false },
+  { href: '/dashboard/admin/orders', label: 'Заказы', icon: ClipboardList, showNotification: true },
+  { href: '/dashboard/admin/cleaners', label: 'Клинеры', icon: Users, showNotification: false },
+  { href: '/dashboard/admin/payments', label: 'Выплаты', icon: DollarSign, showNotification: false },
+  { href: '/dashboard/admin/stats', label: 'Статистика', icon: BarChart3, showNotification: false },
 ]
 
 const cleanerNavItems = [
-  { href: '/dashboard/cleaner', label: 'Главная', icon: LayoutDashboard },
-  { href: '/dashboard/cleaner/orders', label: 'Мои заказы', icon: ClipboardList },
-  { href: '/dashboard/cleaner/new', label: 'Новый заказ', icon: ClipboardList },
-  { href: '/dashboard/cleaner/cash', label: 'Касса', icon: DollarSign },
+  { href: '/dashboard/cleaner', label: 'Главная', icon: LayoutDashboard, showNotification: false },
+  { href: '/dashboard/cleaner/orders', label: 'Мои заказы', icon: ClipboardList, showNotification: true },
+  { href: '/dashboard/cleaner/new', label: 'Новый заказ', icon: ClipboardList, showNotification: false },
+  { href: '/dashboard/cleaner/cash', label: 'Касса', icon: DollarSign, showNotification: false },
 ]
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
@@ -128,13 +128,11 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto" style={{ height: 'calc(100% - 280px)' }}>
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto" style={{ height: 'calc(100% - 340px)' }}>
           {navItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-            
-            // Показываем уведомления только для страницы заказов
-            const showNotification = item.label === 'Заказы' && totalUnread > 0
+            const showNotification = item.showNotification && totalUnread > 0
             
             return (
               <Link
@@ -156,7 +154,6 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                     <div className="bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center shadow-lg animate-pulse">
                       {totalUnread > 99 ? '99+' : totalUnread}
                     </div>
-                    {/* Анимированная точка для привлечения внимания */}
                     <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
                   </div>
                 )}
@@ -167,12 +164,49 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
               </Link>
             )
           })}
+
+          {/* Разделитель */}
+          <div className="pt-4 mt-2 border-t border-gray-200 dark:border-gray-700">
+            <Link
+              href="/dashboard/settings"
+              onClick={onClose}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
+                pathname === '/dashboard/settings'
+                  ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-md'
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+            >
+              <Settings size={20} className={pathname === '/dashboard/settings' ? 'text-white' : 'text-gray-500 group-hover:text-emerald-500'} />
+              <span className="font-medium flex-1">Настройки</span>
+              {pathname === '/dashboard/settings' && (
+                <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
+              )}
+            </Link>
+          </div>
         </nav>
 
         {/* Footer Actions */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-800 space-y-2 bg-white dark:bg-gray-900">
+          
           {/* Theme Toggle */}
-
+          <button
+            onClick={toggleTheme}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
+          >
+            <div className="flex items-center gap-3">
+              {isDark ? (
+                <Sun size={20} className="text-amber-500" />
+              ) : (
+                <Moon size={20} className="text-gray-500" />
+              )}
+              <span className="text-gray-700 dark:text-gray-300">
+                {isDark ? 'Светлая тема' : 'Тёмная тема'}
+              </span>
+            </div>
+            <span className="text-xs text-gray-400">
+              {isDark ? '🌙 → ☀️' : '☀️ → 🌙'}
+            </span>
+          </button>
 
           {/* Logout Button */}
           <button
