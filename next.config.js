@@ -1,7 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    turbo: false,
+  turbopack: {
+    // Настройки Turbopack (если нужны)
+    // root: __dirname, // если нужно указать корень проекта
   },
 }
 

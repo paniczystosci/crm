@@ -13,8 +13,6 @@ import {
   BarChart3, 
   LogOut, 
   X,
-  Moon,
-  Sun,
   Settings,
   UserCog
 } from 'lucide-react'
@@ -44,13 +42,10 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  const [isDark, setIsDark] = useState(false)
   const [userRole, setUserRole] = useState<'admin' | 'cleaner'>('cleaner')
   const { totalUnread } = useUnreadMessages()
 
   useEffect(() => {
-    const isDarkMode = document.documentElement.classList.contains('dark')
-    setIsDark(isDarkMode)
 
     const getUserRole = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -68,17 +63,6 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     getUserRole()
   }, [supabase])
 
-  const toggleTheme = () => {
-    const newTheme = !isDark
-    setIsDark(newTheme)
-    if (newTheme) {
-      document.documentElement.classList.add('dark')
-      localStorage.setItem('theme', 'dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-      localStorage.setItem('theme', 'light')
-    }
-  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -187,26 +171,6 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
 
         {/* Footer Actions */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-800 space-y-2 bg-white dark:bg-gray-900">
-          
-          {/* Theme Toggle */}
-          <button
-            onClick={toggleTheme}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
-          >
-            <div className="flex items-center gap-3">
-              {isDark ? (
-                <Sun size={20} className="text-amber-500" />
-              ) : (
-                <Moon size={20} className="text-gray-500" />
-              )}
-              <span className="text-gray-700 dark:text-gray-300">
-                {isDark ? 'Светлая тема' : 'Тёмная тема'}
-              </span>
-            </div>
-            <span className="text-xs text-gray-400">
-              {isDark ? '🌙 → ☀️' : '☀️ → 🌙'}
-            </span>
-          </button>
 
           {/* Logout Button */}
           <button

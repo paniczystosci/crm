@@ -1,4 +1,5 @@
-import { createServerClient } from '@supabase/auth-helpers-nextjs'
+// src/lib/supabaseServer.ts
+import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
 export async function createClient() {
@@ -9,14 +10,14 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value
+        // Метод getAll используется для ЧТЕНИЯ кук
+        getAll() {
+          return cookieStore.getAll()
         },
-        set(name: string, value: string, options: any) {
-          cookieStore.set({ name, value, ...options })
-        },
-        remove(name: string, options: any) {
-          cookieStore.set({ name, value: '', ...options })
+        // Метод setAll будет вызван, но в Server Component он не должен ничего делать
+        // Вся запись происходит в middleware.ts
+        setAll() {
+          // Пустая функция, так как запись происходит в middleware
         },
       },
     }

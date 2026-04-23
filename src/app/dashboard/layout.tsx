@@ -179,14 +179,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </button>
             </div>
 
-            {/* Кнопка переключения темы в топ-баре */}
-            <button
-              onClick={toggleTheme}
-              className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            >
-              {isDark ? <Sun size={20} className="text-amber-500" /> : <Moon size={20} className="text-gray-700" />}
-            </button>
-
             {/* Выпадающее меню пользователя */}
             <div className="relative user-menu">
               <button
