@@ -1,7 +1,7 @@
 // src/app/(dashboard)/cleaner/new/page.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Calendar, Clock, Loader2, User, Phone, MapPin, Link2, MessageSquare, DollarSign, ArrowLeft, CheckCircle } from 'lucide-react'
@@ -33,7 +33,6 @@ export default function NewOrderPage() {
   const [availableTimes, setAvailableTimes] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [focusedField, setFocusedField] = useState<keyof FormData | null>(null)
 
   const router = useRouter()
   const supabase = createClient()
@@ -102,57 +101,15 @@ export default function NewOrderPage() {
     setSubmitting(false)
   }
 
-  const handleInputChange = (name: keyof FormData, value: string) => {
+  // Оптимизированный обработчик изменения
+  const handleInputChange = useCallback((name: keyof FormData, value: string) => {
     setForm(prev => ({ ...prev, [name]: value }))
-  }
-
-  const InputField = ({ 
-    label, 
-    name, 
-    type = 'text', 
-    required = false,
-    icon: Icon,
-    placeholder = ''
-  }: { 
-    label: string
-    name: keyof FormData
-    type?: string
-    required?: boolean
-    icon: React.ElementType
-    placeholder?: string
-  }) => (
-    <div className="relative">
-      <div className={`absolute left-4 top-1/2 -translate-y-1/2 transition-all duration-200 ${
-        focusedField === name || form[name] ? 'text-emerald-500' : 'text-gray-400'
-      }`}>
-        <Icon size={18} />
-      </div>
-      <input
-        type={type}
-        name={name}
-        required={required}
-        value={form[name]}
-        onChange={(e) => handleInputChange(name, e.target.value)}
-        onFocus={() => setFocusedField(name)}
-        onBlur={() => setFocusedField(null)}
-        className="w-full pl-11 pr-4 py-3.5 text-base bg-gray-50 dark:bg-gray-900 border-2 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all duration-200"
-        style={{
-          borderColor: focusedField === name ? '#10b981' : '#e5e7eb'
-        }}
-        placeholder={placeholder}
-      />
-      <label className={`absolute left-11 -top-2.5 px-2 text-xs transition-all duration-200 bg-white dark:bg-gray-800 rounded-full ${
-        focusedField === name || form[name] ? 'text-emerald-500 -translate-y-0' : 'text-gray-400 translate-y-0 opacity-0'
-      }`}>
-        {label}
-      </label>
-    </div>
-  )
+  }, [])
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-3xl mx-auto pb-20">
       {/* Header with back button */}
-      <div className="mb-8">
+      <div className="mb-6">
         <Link 
           href="/dashboard/cleaner"
           className="inline-flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors mb-4 group"
@@ -166,7 +123,7 @@ export default function NewOrderPage() {
             <Calendar size={20} className="text-white" />
           </div>
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
+            <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
               Новый заказ
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
@@ -179,59 +136,82 @@ export default function NewOrderPage() {
       <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         
         {/* Информация о клиенте */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
-          <h2 className="font-semibold text-lg flex items-center gap-2">
-            <User size={20} className="text-emerald-500" />
+        <div className="p-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
+          <h2 className="font-semibold text-base flex items-center gap-2">
+            <User size={18} className="text-emerald-500" />
             Информация о клиенте
           </h2>
         </div>
-        <div className="p-6 space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <InputField
-              label="Имя клиента"
-              name="client_name"
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-1 gap-4">
+            <div className="relative">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                <User size={18} />
+              </div>
+              <input
+                type="text"
+                required
+                value={form.client_name}
+                onChange={(e) => handleInputChange('client_name', e.target.value)}
+                className="w-full pl-11 pr-4 py-3 text-base bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all duration-200"
+                placeholder="Имя клиента"
+              />
+            </div>
+            
+            <div className="relative">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                <Phone size={18} />
+              </div>
+              <input
+                type="tel"
+                required
+                value={form.client_phone}
+                onChange={(e) => handleInputChange('client_phone', e.target.value)}
+                className="w-full pl-11 pr-4 py-3 text-base bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all duration-200"
+                placeholder="Телефон"
+              />
+            </div>
+          </div>
+          
+          <div className="relative">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+              <MapPin size={18} />
+            </div>
+            <input
+              type="text"
               required
-              icon={User}
-              placeholder="Введите имя"
-            />
-            <InputField
-              label="Телефон"
-              name="client_phone"
-              type="tel"
-              required
-              icon={Phone}
-              placeholder="+48 123 456 789"
+              value={form.address}
+              onChange={(e) => handleInputChange('address', e.target.value)}
+              className="w-full pl-11 pr-4 py-3 text-base bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all duration-200"
+              placeholder="Адрес"
             />
           </div>
           
-          <InputField
-            label="Адрес"
-            name="address"
-            required
-            icon={MapPin}
-            placeholder="Улица, дом, квартира"
-          />
-          
-          <InputField
-            label="Ссылка Google Maps"
-            name="google_maps_link"
-            type="url"
-            icon={Link2}
-            placeholder="https://maps.google.com/..."
-          />
+          <div className="relative">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+              <Link2 size={18} />
+            </div>
+            <input
+              type="url"
+              value={form.google_maps_link}
+              onChange={(e) => handleInputChange('google_maps_link', e.target.value)}
+              className="w-full pl-11 pr-4 py-3 text-base bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all duration-200"
+              placeholder="Ссылка Google Maps (опционально)"
+            />
+          </div>
         </div>
 
         {/* Детали заказа */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
-          <h2 className="font-semibold text-lg flex items-center gap-2">
-            <Calendar size={20} className="text-emerald-500" />
+        <div className="p-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
+          <h2 className="font-semibold text-base flex items-center gap-2">
+            <Calendar size={18} className="text-emerald-500" />
             Детали заказа
           </h2>
         </div>
-        <div className="p-6 space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-1 gap-4">
             <div className="relative">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 transition-all duration-200 text-gray-400">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
                 <Calendar size={18} />
               </div>
               <input
@@ -239,12 +219,12 @@ export default function NewOrderPage() {
                 required
                 value={form.planned_date}
                 onChange={(e) => setForm({ ...form, planned_date: e.target.value })}
-                className="w-full pl-11 pr-4 py-3.5 text-base bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-all duration-200"
+                className="w-full pl-11 pr-4 py-3 text-base bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-all duration-200"
               />
             </div>
 
             <div className="relative">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 transition-all duration-200 text-gray-400">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
                 <Clock size={18} />
               </div>
               <select
@@ -252,7 +232,7 @@ export default function NewOrderPage() {
                 value={form.planned_time}
                 onChange={(e) => setForm({ ...form, planned_time: e.target.value })}
                 disabled={loading || !form.planned_date}
-                className="w-full pl-11 pr-4 py-3.5 text-base bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full pl-11 pr-4 py-3 text-base bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="">Выберите время</option>
                 {availableTimes.map(time => (
@@ -269,7 +249,7 @@ export default function NewOrderPage() {
           </div>
 
           <div className="relative">
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 transition-all duration-200 text-gray-400">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
               <DollarSign size={18} />
             </div>
             <input
@@ -279,33 +259,27 @@ export default function NewOrderPage() {
               min="1"
               value={form.price}
               onChange={(e) => setForm({ ...form, price: e.target.value })}
-              className="w-full pl-11 pr-4 py-3.5 text-base bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all duration-200"
-              placeholder="0.00"
+              className="w-full pl-11 pr-4 py-3 text-base bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all duration-200"
+              placeholder="Цена (zł)"
             />
-            <label className="absolute left-11 -top-2.5 px-2 text-xs text-gray-500 bg-white dark:bg-gray-800 rounded-full">
-              Цена (zł)
-            </label>
           </div>
 
           <div className="relative">
-            <div className="absolute left-4 top-5 transition-all duration-200 text-gray-400">
+            <div className="absolute left-4 top-4 text-gray-400">
               <MessageSquare size={18} />
             </div>
             <textarea
               value={form.comment}
               onChange={(e) => setForm({ ...form, comment: e.target.value })}
               rows={3}
-              className="w-full pl-11 pr-4 py-3.5 text-base bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all duration-200 resize-none"
-              placeholder="Дополнительная информация..."
+              className="w-full pl-11 pr-4 py-3 text-base bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all duration-200 resize-none"
+              placeholder="Дополнительная информация (опционально)..."
             />
-            <label className="absolute left-11 -top-2.5 px-2 text-xs text-gray-500 bg-white dark:bg-gray-800 rounded-full">
-              Комментарий
-            </label>
           </div>
         </div>
 
         {/* Кнопки */}
-        <div className="p-6 bg-gray-50 dark:bg-gray-800/50 flex flex-col sm:flex-row gap-3">
+        <div className="p-5 bg-gray-50 dark:bg-gray-800/50 flex flex-col sm:flex-row gap-3">
           <button
             type="button"
             onClick={() => router.back()}
