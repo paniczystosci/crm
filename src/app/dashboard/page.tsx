@@ -149,7 +149,7 @@ export default function AdminDashboard() {
                       className="group inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl transition-all duration-200 shadow-md hover:shadow-lg"
                     >
                       <Wallet size={18} />
-                      <span className="font-medium">Сделать выплату</span>
+                      <span className="font-medium">Выплатить</span>
                       <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
                     </Link>
                   </div>
