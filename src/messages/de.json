@@ -207,6 +207,7 @@
     "ordersAwaiting": "Aufträge warten auf Inkasso"
   },
   "settings": {
+    "edit": "Bearbeiten",
     "title": "Einstellungen",
     "password": "Passwort ändern",
     "currentPassword": "Aktuelles Passwort",

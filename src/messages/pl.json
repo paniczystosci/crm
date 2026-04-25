@@ -207,6 +207,7 @@
     "ordersAwaiting": "Zamówienia oczekujące na inkasację"
   },
   "settings": {
+    "edit": "Edytuj",
     "title": "Ustawienia",
     "password": "Zmiana hasła",
     "currentPassword": "Aktualne hasło",
