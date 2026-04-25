@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import { useTranslations } from 'next-intl'
 import { 
   LayoutDashboard, 
   ClipboardList, 
@@ -24,6 +25,11 @@ type SidebarProps = {
 }
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
+  const t = useTranslations('common')
+  const navT = useTranslations('nav')
+  const cleanersT = useTranslations('cleaners')
+  const settingsT = useTranslations('settings')
+  
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -68,17 +74,17 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   }
 
   const adminNavItems = [
-    { href: '/dashboard/admin', label: 'Главная', icon: LayoutDashboard },
-    { href: '/dashboard/admin/orders', label: 'Заказы', icon: ClipboardList, showNotification: true },
-    { href: '/dashboard/admin/cleaners', label: 'Клинеры', icon: Users },
-    { href: '/dashboard/admin/payments', label: 'Выплаты', icon: DollarSign },
-    { href: '/dashboard/admin/stats', label: 'Статистика', icon: BarChart3 },
+    { href: '/dashboard/admin', label: navT('dashboard'), icon: LayoutDashboard, showNotification: false },
+    { href: '/dashboard/admin/orders', label: navT('orders'), icon: ClipboardList, showNotification: true },
+    { href: '/dashboard/admin/cleaners', label: cleanersT('title'), icon: Users, showNotification: false },
+    { href: '/dashboard/admin/payments', label: navT('payments'), icon: DollarSign, showNotification: false },
+    { href: '/dashboard/admin/stats', label: navT('stats'), icon: BarChart3, showNotification: false },
   ]
 
   const cleanerNavItems = [
-    { href: '/dashboard/cleaner', label: 'Мои заказы', icon: ClipboardList, showNotification: true },
-    { href: '/dashboard/cleaner/new', label: 'Новый заказ', icon: Plus },
-    { href: '/dashboard/cleaner/cash', label: 'Касса', icon: DollarSign },
+    { href: '/dashboard/cleaner', label: navT('myOrders'), icon: ClipboardList, showNotification: true },
+    { href: '/dashboard/cleaner/new', label: navT('newOrder'), icon: Plus, showNotification: false },
+    { href: '/dashboard/cleaner/cash', label: navT('cash'), icon: DollarSign, showNotification: false },
   ]
 
   const navItems = userRole === 'admin' ? adminNavItems : cleanerNavItems
@@ -101,12 +107,12 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
-              <span className="text-white font-bold text-xl">П</span>
+              <span className="text-white font-bold text-xl">C</span>
             </div>
             <div>
-              <h2 className="text-2xl font-bold">Pani Czystości</h2>
+              <h2 className="text-2xl font-bold">{t('companyName')}</h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                {userRole === 'admin' ? 'Администратор' : 'Клинер'}
+                {userRole === 'admin' ? t('admin') : t('cleaner')}
               </p>
             </div>
           </div>
@@ -157,7 +163,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
               }`}
             >
               <Settings size={22} />
-              <span className="font-medium">Настройки</span>
+              <span className="font-medium">{settingsT('title')}</span>
             </Link>
           </div>
         </nav>
@@ -169,7 +175,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
             className="w-full flex items-center justify-center gap-3 py-3 rounded-2xl bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-950 text-red-600 font-medium transition-colors"
           >
             <LogOut size={20} />
-            Выйти из аккаунта
+            {t('logout')}
           </button>
         </div>
       </div>

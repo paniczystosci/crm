@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import { useTranslations } from 'next-intl'
 import { Calendar, DollarSign, Banknote, ArrowLeft, Wallet, TrendingUp, Clock, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 
@@ -16,6 +17,10 @@ type PendingOrder = {
 }
 
 export default function CleanerCashPage() {
+  const t = useTranslations('common')
+  const cashT = useTranslations('cash')
+  const ordersT = useTranslations('orders')
+  
   const [summary, setSummary] = useState({ totalCash: 0, totalBank: 0 })
   const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([])
   const [loading, setLoading] = useState(true)
@@ -49,13 +54,12 @@ export default function CleanerCashPage() {
   }
 
   const handleHandover = async () => {
-    if (!confirm(`Сдать кассу?\n\nНаличные: ${summary.totalCash} zł\nНа счёт: ${summary.totalBank} zł\n\nПосле сдачи кассы администратор подтвердит операцию.`)) return
+    if (!confirm(cashT('handoverPrompt', { cash: summary.totalCash, bank: summary.totalBank }))) return
 
     setHandingOver(true)
     
-    // Имитация отправки запроса
     setTimeout(() => {
-      alert('✅ Касса сдана! Ожидайте подтверждения администратора.')
+      alert(cashT('handoverSuccess'))
       setHandingOver(false)
       fetchCash()
     }, 1000)
@@ -67,7 +71,7 @@ export default function CleanerCashPage() {
         <div className="relative">
           <div className="animate-spin rounded-full h-12 w-12 border-2 border-emerald-600 border-t-transparent"></div>
         </div>
-        <p className="mt-4 text-gray-500 dark:text-gray-400">Загрузка данных кассы...</p>
+        <p className="mt-4 text-gray-500 dark:text-gray-400">{t('loading')}</p>
       </div>
     )
   }
@@ -83,7 +87,7 @@ export default function CleanerCashPage() {
           className="inline-flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors mb-4 group"
         >
           <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-          <span>Назад к заказам</span>
+          <span>{ordersT('backToOrders')}</span>
         </Link>
         
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -93,10 +97,10 @@ export default function CleanerCashPage() {
             </div>
             <div>
               <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
-                Касса
+                {cashT('title')}
               </h1>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                Управление наличными и безналичными средствами
+                {cashT('cashReceived')} {t('and')} {cashT('bankReceived')}
               </p>
             </div>
           </div>
@@ -113,12 +117,12 @@ export default function CleanerCashPage() {
             {handingOver ? (
               <>
                 <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                <span>Сдача...</span>
+                <span>{t('loading')}</span>
               </>
             ) : (
               <>
                 <Banknote size={18} />
-                <span>Сдать кассу</span>
+                <span>{cashT('handoverCash')}</span>
               </>
             )}
           </button>
@@ -136,9 +140,9 @@ export default function CleanerCashPage() {
               </div>
               <TrendingUp size={20} className="text-emerald-500 opacity-50" />
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Наличные средства</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">{cashT('cashReceived')}</p>
             <p className="text-4xl font-bold text-emerald-600 dark:text-emerald-400">{summary.totalCash} zł</p>
-            <p className="text-xs text-gray-400 mt-2">Ожидают инкассации</p>
+            <p className="text-xs text-gray-400 mt-2">{cashT('awaitingIncassation')}</p>
           </div>
           <div className="h-1 bg-gradient-to-r from-emerald-500 to-teal-500 w-full transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></div>
         </div>
@@ -152,9 +156,9 @@ export default function CleanerCashPage() {
               </div>
               <TrendingUp size={20} className="text-blue-500 opacity-50" />
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Безналичные средства</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">{cashT('bankReceived')}</p>
             <p className="text-4xl font-bold text-blue-600 dark:text-blue-400">{summary.totalBank} zł</p>
-            <p className="text-xs text-gray-400 mt-2">На счёте фирмы</p>
+            <p className="text-xs text-gray-400 mt-2">{cashT('awaitingIncassation')}</p>
           </div>
           <div className="h-1 bg-gradient-to-r from-blue-500 to-cyan-500 w-full transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></div>
         </div>
@@ -169,10 +173,10 @@ export default function CleanerCashPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
-                У вас есть средства для сдачи
+                {cashT('hasFunds')}
               </p>
               <p className="text-xs text-amber-600 dark:text-amber-400">
-                Нажмите кнопку "Сдать кассу" чтобы передать средства администратору
+                {cashT('handoverPrompt')}
               </p>
             </div>
           </div>
@@ -186,9 +190,9 @@ export default function CleanerCashPage() {
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-lg flex items-center gap-2">
                 <Calendar size={20} className="text-emerald-500" />
-                Заказы, ожидающие инкассации
+                {cashT('ordersAwaiting')}
               </h2>
-              <span className="text-xs text-gray-500">{pendingOrders.length} заказов</span>
+              <span className="text-xs text-gray-500">{pendingOrders.length} {pendingOrders.length === 1 ? ordersT('order') : ordersT('orders')}</span>
             </div>
           </div>
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -220,14 +224,14 @@ export default function CleanerCashPage() {
                       <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl">
                         <DollarSign size={16} className="text-emerald-600" />
                         <span className="font-semibold text-emerald-700 dark:text-emerald-300">
-                          {order.cash_received} zł наличными
+                          {order.cash_received} zł {t('cash')}
                         </span>
                       </div>
                     ) : order.bank_received ? (
                       <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/30 rounded-xl">
                         <Banknote size={16} className="text-blue-600" />
                         <span className="font-semibold text-blue-700 dark:text-blue-300">
-                          {order.bank_received} zł на счёт
+                          {order.bank_received} zł {t('bankTransfer')}
                         </span>
                       </div>
                     ) : null}
@@ -244,9 +248,9 @@ export default function CleanerCashPage() {
               <CheckCircle size={40} className="text-gray-400" />
             </div>
             <div>
-              <p className="text-xl font-medium text-gray-900 dark:text-white">Нет заказов для инкассации</p>
+              <p className="text-xl font-medium text-gray-900 dark:text-white">{cashT('noOrders')}</p>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Все выполненные заказы уже сданы
+                {cashT('allHandedOver')}
               </p>
             </div>
           </div>
@@ -255,7 +259,7 @@ export default function CleanerCashPage() {
 
       {/* Footer Note */}
       <div className="mt-8 text-center text-xs text-gray-400 dark:text-gray-600">
-        <p>Средства будут переданы администратору после подтверждения инкассации</p>
+        <p>{cashT('handoverSuccess')}</p>
       </div>
     </div>
   )

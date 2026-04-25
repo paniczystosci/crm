@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import { useTranslations } from 'next-intl'
 import { Check, X, Calendar, User, DollarSign, Wallet, CreditCard, Clock, AlertCircle, TrendingUp } from 'lucide-react'
 
 type PaymentOrder = {
@@ -22,6 +23,12 @@ type PaymentOrder = {
 }
 
 export default function AdminPayments() {
+  const t = useTranslations('common')
+  const paymentsT = useTranslations('payments')
+  const ordersT = useTranslations('orders')
+  const cleanersT = useTranslations('cleaners')
+  const errorsT = useTranslations('errors')
+  
   const [orders, setOrders] = useState<PaymentOrder[]>([])
   const [manualSalary, setManualSalary] = useState<Record<string, number>>({})
   const [filter, setFilter] = useState<'all' | 'unpaid' | 'paid'>('unpaid')
@@ -92,7 +99,7 @@ export default function AdminPayments() {
     if (!error) {
       fetchPayments()
     } else {
-      alert('Ошибка при отметке выплаты')
+      alert(errorsT('serverError'))
     }
   }
 
@@ -131,11 +138,11 @@ export default function AdminPayments() {
                   <Wallet size={20} className="text-white" />
                 </div>
                 <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
-                  Выплаты клинерам
+                  {paymentsT('title')}
                 </h1>
               </div>
               <p className="text-gray-500 dark:text-gray-400 ml-13">
-                Управление зарплатами за выполненные заказы
+                {paymentsT('manage')}
               </p>
             </div>
             
@@ -146,7 +153,7 @@ export default function AdminPayments() {
                   <TrendingUp size={24} className="text-white" />
                 </div>
                 <div>
-                  <p className="text-emerald-100 text-xs uppercase tracking-wider">К выплате сейчас</p>
+                  <p className="text-emerald-100 text-xs uppercase tracking-wider">{paymentsT('toPay')}</p>
                   <p className="text-3xl font-bold text-white">{totalToPay.toFixed(0)} zł</p>
                 </div>
               </div>
@@ -159,7 +166,7 @@ export default function AdminPayments() {
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Всего заказов</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{paymentsT('allOrders')}</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{stats.totalOrders}</p>
               </div>
               <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center">
@@ -171,7 +178,7 @@ export default function AdminPayments() {
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Не выплачено</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{paymentsT('unpaid')}</p>
                 <p className="text-2xl font-bold text-amber-600 mt-1">{stats.unpaidOrders}</p>
               </div>
               <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center">
@@ -183,7 +190,7 @@ export default function AdminPayments() {
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Выплачено</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{paymentsT('paid')}</p>
                 <p className="text-2xl font-bold text-emerald-600 mt-1">{stats.paidOrders}</p>
               </div>
               <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center">
@@ -195,7 +202,7 @@ export default function AdminPayments() {
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Выплачено сумма</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{paymentsT('paidAmount')}</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{stats.totalPaidAmount} zł</p>
               </div>
               <div className="h-10 w-10 rounded-full bg-purple-100 dark:bg-purple-950/50 flex items-center justify-center">
@@ -211,9 +218,9 @@ export default function AdminPayments() {
             {(['all', 'unpaid', 'paid'] as const).map((f) => {
               const isActive = filter === f
               const getLabel = () => {
-                if (f === 'all') return 'Все заказы'
-                if (f === 'unpaid') return 'Не выплачено'
-                return 'Выплачено'
+                if (f === 'all') return paymentsT('allOrders')
+                if (f === 'unpaid') return paymentsT('unpaid')
+                return paymentsT('paid')
               }
               const getCount = () => {
                 if (f === 'all') return stats.totalOrders
@@ -226,7 +233,7 @@ export default function AdminPayments() {
                   onClick={() => setFilter(f)}
                   className={`group relative px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                     isActive
-                      ? 'bg-gradient-to-r from-rose-600 to-rose-500 text-white shadow-md'
+                      ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-md'
                       : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
                   }`}
                 >
@@ -250,9 +257,9 @@ export default function AdminPayments() {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
             <div className="relative">
-              <div className="animate-spin rounded-full h-12 w-12 border-2 border-rose-600 border-t-transparent"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-2 border-emerald-600 border-t-transparent"></div>
             </div>
-            <p className="mt-4 text-gray-500 dark:text-gray-400">Загрузка заказов...</p>
+            <p className="mt-4 text-gray-500 dark:text-gray-400">{t('loading')}</p>
           </div>
         ) : orders.length === 0 ? (
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-16 text-center">
@@ -261,11 +268,11 @@ export default function AdminPayments() {
                 <Wallet size={40} className="text-gray-400" />
               </div>
               <div>
-                <p className="text-xl font-medium text-gray-900 dark:text-white">Нет заказов</p>
+                <p className="text-xl font-medium text-gray-900 dark:text-white">{paymentsT('noOrders')}</p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  {filter === 'unpaid' && 'Нет заказов, ожидающих выплаты'}
-                  {filter === 'paid' && 'Нет выплаченных заказов'}
-                  {filter === 'all' && 'Список заказов пуст'}
+                  {filter === 'unpaid' && paymentsT('noUnpaidOrders')}
+                  {filter === 'paid' && paymentsT('noPaidOrders')}
+                  {filter === 'all' && paymentsT('noOrders')}
                 </p>
               </div>
             </div>
@@ -276,12 +283,12 @@ export default function AdminPayments() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800">
-                    <th className="text-left p-5 font-semibold text-gray-700 dark:text-gray-300">Клиент / Дата</th>
-                    <th className="text-left p-5 font-semibold text-gray-700 dark:text-gray-300">Клинер</th>
-                    <th className="text-left p-5 font-semibold text-gray-700 dark:text-gray-300">Цена заказа</th>
-                    <th className="text-left p-5 font-semibold text-gray-700 dark:text-gray-300">Тип зарплаты</th>
-                    <th className="text-right p-5 font-semibold text-gray-700 dark:text-gray-300">Зарплата</th>
-                    <th className="text-center p-5 font-semibold text-gray-700 dark:text-gray-300">Статус</th>
+                    <th className="text-left p-5 font-semibold text-gray-700 dark:text-gray-300">{paymentsT('orderClient')}</th>
+                    <th className="text-left p-5 font-semibold text-gray-700 dark:text-gray-300">{paymentsT('cleaner')}</th>
+                    <th className="text-left p-5 font-semibold text-gray-700 dark:text-gray-300">{paymentsT('orderPrice')}</th>
+                    <th className="text-left p-5 font-semibold text-gray-700 dark:text-gray-300">{paymentsT('salaryType')}</th>
+                    <th className="text-right p-5 font-semibold text-gray-700 dark:text-gray-300">{paymentsT('salaryAmount')}</th>
+                    <th className="text-center p-5 font-semibold text-gray-700 dark:text-gray-300">{paymentsT('status')}</th>
                     <th className="w-40 p-5"></th>
                   </tr>
                 </thead>
@@ -310,7 +317,7 @@ export default function AdminPayments() {
                               </span>
                             </div>
                             <span className="text-gray-900 dark:text-white">
-                              {order.profiles?.full_name || 'Не назначен'}
+                              {order.profiles?.full_name || cleanersT('notAssigned')}
                             </span>
                           </div>
                         </td>
@@ -325,7 +332,7 @@ export default function AdminPayments() {
                               ? 'bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300'
                               : 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
                           }`}>
-                            {rate === 'manual' ? 'Ручная' : `${rate}%`}
+                            {rate === 'manual' ? cleanersT('manual') : `${rate}%`}
                           </span>
                         </td>
 
@@ -335,7 +342,7 @@ export default function AdminPayments() {
                               <span className="text-sm text-gray-500">zł</span>
                               <input
                                 type="number"
-                                className="w-28 px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-right focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all"
+                                className="w-28 px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-right focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                                 value={
                                   manualSalary[order.id] !== undefined
                                     ? manualSalary[order.id]
@@ -360,12 +367,12 @@ export default function AdminPayments() {
                           {isPaid ? (
                             <div className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1.5 rounded-full text-sm">
                               <Check size={14} />
-                              <span>Выплачено</span>
+                              <span>{paymentsT('paid')}</span>
                             </div>
                           ) : (
                             <div className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-3 py-1.5 rounded-full text-sm">
                               <AlertCircle size={14} />
-                              <span>Не выплачено</span>
+                              <span>{paymentsT('unpaid')}</span>
                             </div>
                           )}
                         </td>
@@ -376,13 +383,13 @@ export default function AdminPayments() {
                               onClick={() => markAsPaid(order)}
                               className="bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg whitespace-nowrap"
                             >
-                              Выплатить
+                              {paymentsT('payNow')}
                             </button>
                           )}
 
                           {isPaid && order.paid_at && (
                             <div className="text-xs text-gray-500 dark:text-gray-400 text-right">
-                              <div>Выплачено: {order.salary_value} zł</div>
+                              <div>{paymentsT('paidAt')}: {order.salary_value} zł</div>
                               <div>{new Date(order.paid_at).toLocaleDateString('ru-RU')}</div>
                             </div>
                           )}
@@ -398,7 +405,7 @@ export default function AdminPayments() {
 
         {/* Footer Note */}
         <div className="mt-12 text-center text-xs text-gray-400 dark:text-gray-600">
-          <p>© 2026 Управление клинингом • Система выплат клинерам</p>
+          <p>© 2026 CRM Cleaning Company • {paymentsT('title')}</p>
         </div>
       </div>
     </div>

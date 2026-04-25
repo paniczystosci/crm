@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { Calendar, Clock, Loader2, User, Phone, MapPin, Link2, MessageSquare, DollarSign, ArrowLeft, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 
@@ -19,6 +20,11 @@ type FormData = {
 }
 
 export default function NewOrderPage() {
+  const t = useTranslations('common')
+  const ordersT = useTranslations('orders')
+  const chatT = useTranslations('chat')
+  const errorsT = useTranslations('errors')
+  
   const [form, setForm] = useState<FormData>({
     client_name: '',
     client_phone: '',
@@ -92,7 +98,7 @@ export default function NewOrderPage() {
     })
 
     if (error) {
-      alert('Ошибка создания заказа: ' + error.message)
+      alert(`${errorsT('serverError')}: ${error.message}`)
     } else {
       router.push('/dashboard/cleaner')
       router.refresh()
@@ -101,7 +107,6 @@ export default function NewOrderPage() {
     setSubmitting(false)
   }
 
-  // Оптимизированный обработчик изменения
   const handleInputChange = useCallback((name: keyof FormData, value: string) => {
     setForm(prev => ({ ...prev, [name]: value }))
   }, [])
@@ -115,7 +120,7 @@ export default function NewOrderPage() {
           className="inline-flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors mb-4 group"
         >
           <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-          <span>Назад к заказам</span>
+          <span>{ordersT('backToOrders')}</span>
         </Link>
         
         <div className="flex items-center gap-3">
@@ -124,10 +129,10 @@ export default function NewOrderPage() {
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
-              Новый заказ
+              {ordersT('new')}
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-              Заполните информацию о клиенте и уборке
+              {ordersT('create')}
             </p>
           </div>
         </div>
@@ -139,7 +144,7 @@ export default function NewOrderPage() {
         <div className="p-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
           <h2 className="font-semibold text-base flex items-center gap-2">
             <User size={18} className="text-emerald-500" />
-            Информация о клиенте
+            {ordersT('client')}
           </h2>
         </div>
         <div className="p-5 space-y-4">
@@ -154,7 +159,7 @@ export default function NewOrderPage() {
                 value={form.client_name}
                 onChange={(e) => handleInputChange('client_name', e.target.value)}
                 className="w-full pl-11 pr-4 py-3 text-base bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all duration-200"
-                placeholder="Имя клиента"
+                placeholder={ordersT('client')}
               />
             </div>
             
@@ -168,7 +173,7 @@ export default function NewOrderPage() {
                 value={form.client_phone}
                 onChange={(e) => handleInputChange('client_phone', e.target.value)}
                 className="w-full pl-11 pr-4 py-3 text-base bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all duration-200"
-                placeholder="Телефон"
+                placeholder={ordersT('phone')}
               />
             </div>
           </div>
@@ -183,7 +188,7 @@ export default function NewOrderPage() {
               value={form.address}
               onChange={(e) => handleInputChange('address', e.target.value)}
               className="w-full pl-11 pr-4 py-3 text-base bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all duration-200"
-              placeholder="Адрес"
+              placeholder={ordersT('address')}
             />
           </div>
           
@@ -196,7 +201,7 @@ export default function NewOrderPage() {
               value={form.google_maps_link}
               onChange={(e) => handleInputChange('google_maps_link', e.target.value)}
               className="w-full pl-11 pr-4 py-3 text-base bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all duration-200"
-              placeholder="Ссылка Google Maps (опционально)"
+              placeholder={t('googleMaps')}
             />
           </div>
         </div>
@@ -205,7 +210,7 @@ export default function NewOrderPage() {
         <div className="p-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
           <h2 className="font-semibold text-base flex items-center gap-2">
             <Calendar size={18} className="text-emerald-500" />
-            Детали заказа
+            {ordersT('details')}
           </h2>
         </div>
         <div className="p-5 space-y-4">
@@ -234,7 +239,7 @@ export default function NewOrderPage() {
                 disabled={loading || !form.planned_date}
                 className="w-full pl-11 pr-4 py-3 text-base bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <option value="">Выберите время</option>
+                <option value="">{ordersT('selectTime')}</option>
                 {availableTimes.map(time => (
                   <option key={time} value={time}>{time}</option>
                 ))}
@@ -242,7 +247,7 @@ export default function NewOrderPage() {
               {loading && (
                 <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
                   <Loader2 size={12} className="animate-spin" />
-                  Загрузка доступных слотов...
+                  {t('loading')}
                 </p>
               )}
             </div>
@@ -260,7 +265,7 @@ export default function NewOrderPage() {
               value={form.price}
               onChange={(e) => setForm({ ...form, price: e.target.value })}
               className="w-full pl-11 pr-4 py-3 text-base bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all duration-200"
-              placeholder="Цена (zł)"
+              placeholder={`${ordersT('price')} (zł)`}
             />
           </div>
 
@@ -273,7 +278,7 @@ export default function NewOrderPage() {
               onChange={(e) => setForm({ ...form, comment: e.target.value })}
               rows={3}
               className="w-full pl-11 pr-4 py-3 text-base bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all duration-200 resize-none"
-              placeholder="Дополнительная информация (опционально)..."
+              placeholder={`${ordersT('comment')} (${t('optional')})...`}
             />
           </div>
         </div>
@@ -285,7 +290,7 @@ export default function NewOrderPage() {
             onClick={() => router.back()}
             className="flex-1 py-3.5 rounded-xl border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200"
           >
-            Отмена
+            {t('cancel')}
           </button>
           <button
             type="submit"
@@ -295,12 +300,12 @@ export default function NewOrderPage() {
             {submitting ? (
               <>
                 <Loader2 className="animate-spin" size={20} />
-                <span>Создание...</span>
+                <span>{t('loading')}</span>
               </>
             ) : (
               <>
                 <CheckCircle size={18} />
-                <span>Создать заказ</span>
+                <span>{ordersT('create')}</span>
               </>
             )}
           </button>

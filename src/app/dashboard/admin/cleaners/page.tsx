@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import { useTranslations } from 'next-intl'
 import { UserPlus, DollarSign, Banknote, CheckCircle, X, Users, Percent, Shield, Sparkles } from 'lucide-react'
 import { createNewUser } from '@/app/actions/createUser'
 
@@ -16,6 +17,10 @@ type Cleaner = {
 }
 
 export default function AdminCleaners() {
+  const t = useTranslations('common')
+  const cleanersT = useTranslations('cleaners')
+  const errorsT = useTranslations('errors')
+  
   const [cleaners, setCleaners] = useState<Cleaner[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -87,7 +92,7 @@ export default function AdminCleaners() {
   }
 
   const confirmIncassation = async (cleanerId: string, cleanerName: string) => {
-    if (!confirm(`Подтвердить инкассацию для ${cleanerName}?\nВсе наличные и оплаты на счёт будут отмечены как принятые.`)) return
+    if (!confirm(`${t('confirm')} ${cleanersT('confirmIncassation')} ${cleanerName}?`)) return
 
     const { error } = await supabase
       .from('orders')
@@ -96,9 +101,9 @@ export default function AdminCleaners() {
       .eq('status', 'done')
       .eq('is_incassed', false)
 
-    if (error) alert('Ошибка при подтверждении инкассации')
+    if (error) alert(errorsT('serverError'))
     else {
-      alert(`Инкассация для ${cleanerName} успешно подтверждена!`)
+      alert(`${cleanersT('confirmIncassation')} ${cleanerName} ${t('success')}!`)
       fetchCleaners()
     }
   }
@@ -121,13 +126,13 @@ export default function AdminCleaners() {
       setShowForm(false)
       fetchCleaners()
     } else {
-      alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'))
+      alert(`${errorsT('serverError')}: ${result.error || t('error')}`)
     }
     setSubmitting(false)
   }
 
   const getRateLabel = (rate: string) => {
-    if (rate === 'manual') return 'Ручная'
+    if (rate === 'manual') return cleanersT('manual')
     return `${rate}%`
   }
 
@@ -143,19 +148,19 @@ export default function AdminCleaners() {
                 <Users size={20} className="text-white" />
               </div>
               <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
-                Команда
+                {cleanersT('title')}
               </h1>
             </div>
             <p className="text-gray-500 dark:text-gray-400 ml-13">
-              Управление сотрудниками и их выплатами
+              {t('adminDescription')}
             </p>
           </div>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="group relative inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-700 hover:to-rose-600 text-white rounded-2xl font-medium transition-all duration-200 shadow-md hover:shadow-xl"
+            className="group relative inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white rounded-2xl font-medium transition-all duration-200 shadow-md hover:shadow-xl"
           >
             <UserPlus size={20} className="group-hover:scale-110 transition-transform" />
-            <span>Добавить сотрудника</span>
+            <span>{cleanersT('addCleaner')}</span>
           </button>
         </div>
 
@@ -164,12 +169,12 @@ export default function AdminCleaners() {
           <div className="mb-8 animate-in slide-in-from-top-4 duration-300">
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
               <div className="relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-rose-500/5 to-purple-500/5 rounded-full blur-3xl"></div>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-emerald-500/5 to-purple-500/5 rounded-full blur-3xl"></div>
                 <div className="relative p-6 md:p-8">
                   <div className="flex justify-between items-start mb-6">
                     <div>
-                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Добавить нового сотрудника</h2>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Заполните информацию для создания аккаунта</p>
+                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{cleanersT('addCleaner')}</h2>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('create')}</p>
                     </div>
                     <button
                       onClick={() => { setShowForm(false); setFormData({ full_name: '', email: '', role: 'cleaner', payout_rate: '25' }) }}
@@ -183,56 +188,56 @@ export default function AdminCleaners() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          ФИО
+                          {cleanersT('name')}
                         </label>
                         <input 
                           type="text" 
                           required 
                           value={formData.full_name} 
                           onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} 
-                          className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all"
-                          placeholder="Иван Иванов"
+                          className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                          placeholder={cleanersT('name')}
                         />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Email
+                          {cleanersT('email')}
                         </label>
                         <input 
                           type="email" 
                           required 
                           value={formData.email} 
                           onChange={(e) => setFormData({ ...formData, email: e.target.value })} 
-                          className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all"
-                          placeholder="ivan@example.com"
+                          className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                          placeholder="email@example.com"
                         />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Роль
+                          {cleanersT('role')}
                         </label>
                         <select 
                           value={formData.role} 
                           onChange={(e) => setFormData({ ...formData, role: e.target.value as 'admin' | 'cleaner' })} 
-                          className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all"
+                          className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                         >
-                          <option value="cleaner">Клинер</option>
-                          <option value="admin">Администратор</option>
+                          <option value="cleaner">{cleanersT('cleanerRole')}</option>
+                          <option value="admin">{cleanersT('admin')}</option>
                         </select>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Ставка выплаты клинеру
+                          {cleanersT('payoutRate')}
                         </label>
                         <select 
                           value={formData.payout_rate} 
                           onChange={(e) => setFormData({ ...formData, payout_rate: e.target.value })} 
-                          className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all"
+                          className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                         >
                           <option value="15">15%</option>
                           <option value="25">25%</option>
                           <option value="50">50%</option>
-                          <option value="manual">Ручная сумма</option>
+                          <option value="manual">{cleanersT('manual')}</option>
                         </select>
                       </div>
                     </div>
@@ -241,15 +246,15 @@ export default function AdminCleaners() {
                       <button 
                         type="submit" 
                         disabled={submitting} 
-                        className="flex-1 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-700 hover:to-rose-600 text-white py-3.5 rounded-xl font-medium transition-all duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-1 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white py-3.5 rounded-xl font-medium transition-all duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {submitting ? (
                           <span className="flex items-center justify-center gap-2">
                             <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                            Создаём...
+                            {t('loading')}
                           </span>
                         ) : (
-                          'Создать сотрудника'
+                          t('save')
                         )}
                       </button>
                       <button 
@@ -257,7 +262,7 @@ export default function AdminCleaners() {
                         onClick={() => { setShowForm(false); setFormData({ full_name: '', email: '', role: 'cleaner', payout_rate: '25' }) }} 
                         className="flex-1 py-3.5 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
                       >
-                        Отмена
+                        {t('cancel')}
                       </button>
                     </div>
                   </form>
@@ -271,20 +276,20 @@ export default function AdminCleaners() {
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
-              <h2 className="font-bold text-xl text-gray-900 dark:text-white">Список сотрудников</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Управление ролями и выплатами</p>
+              <h2 className="font-bold text-xl text-gray-900 dark:text-white">{cleanersT('teamList')}</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{cleanersT('manage')}</p>
             </div>
             <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-xl">
               <Users size={16} className="text-gray-500" />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{cleaners.length} человек</span>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{cleaners.length} {t('people')}</span>
             </div>
           </div>
 
           {loading ? (
             <div className="p-12 text-center">
               <div className="inline-flex items-center gap-3 text-gray-500">
-                <div className="animate-spin rounded-full h-5 w-5 border-2 border-rose-600 border-t-transparent"></div>
-                <span>Загрузка сотрудников...</span>
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-emerald-600 border-t-transparent"></div>
+                <span>{t('loading')}</span>
               </div>
             </div>
           ) : (
@@ -306,10 +311,10 @@ export default function AdminCleaners() {
                         </div>
                         <div className="min-w-0">
                           <div className="font-semibold text-lg text-gray-900 dark:text-white truncate">
-                            {person.full_name || 'Без имени'}
+                            {person.full_name || t('noName')}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
-                            ID: {person.id.slice(0, 8)}...
+                            {cleanersT('id')}: {person.id.slice(0, 8)}...
                           </div>
                         </div>
                       </div>
@@ -326,7 +331,7 @@ export default function AdminCleaners() {
                             ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300' 
                             : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300'
                         }`}>
-                          {person.role === 'admin' ? 'Администратор' : 'Клинер'}
+                          {person.role === 'admin' ? cleanersT('admin') : cleanersT('cleanerRole')}
                         </span>
                       </div>
 
@@ -334,24 +339,24 @@ export default function AdminCleaners() {
                       <div className="flex flex-col">
                         <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 mb-1">
                           <Percent size={12} />
-                          <span>СТАВКА</span>
+                          <span>{cleanersT('rate').toUpperCase()}</span>
                         </div>
                         <select
                           value={person.payout_rate}
                           onChange={(e) => updatePayoutRate(person.id, e.target.value)}
-                          className="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all cursor-pointer hover:border-rose-300"
+                          className="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all cursor-pointer hover:border-emerald-300"
                         >
                           <option value="15">15%</option>
                           <option value="25">25%</option>
                           <option value="50">50%</option>
-                          <option value="manual">Ручная</option>
+                          <option value="manual">{cleanersT('manual')}</option>
                         </select>
                       </div>
 
                       {/* КАССА (только для клинеров) */}
                       {person.role === 'cleaner' && (
                         <div className="flex flex-col">
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">КАССА</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">{cleanersT('cashDesk')}</div>
                           <div className="flex flex-wrap items-center gap-4">
                             <div className="flex items-center gap-3">
                               <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1.5 rounded-xl">
@@ -366,11 +371,11 @@ export default function AdminCleaners() {
 
                             {(person.totalCash > 0 || person.totalBank > 0) && (
                               <button
-                                onClick={() => confirmIncassation(person.id, person.full_name || 'Клинер')}
+                                onClick={() => confirmIncassation(person.id, person.full_name || cleanersT('cleanerRole'))}
                                 className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg whitespace-nowrap"
                               >
                                 <CheckCircle size={16} />
-                                Подтвердить
+                                {cleanersT('confirmIncassation')}
                               </button>
                             )}
                           </div>
@@ -385,12 +390,12 @@ export default function AdminCleaners() {
                 <div className="p-12 text-center">
                   <div className="inline-flex flex-col items-center gap-3">
                     <Users size={48} className="text-gray-400" />
-                    <p className="text-gray-500 dark:text-gray-400">Нет сотрудников</p>
+                    <p className="text-gray-500 dark:text-gray-400">{cleanersT('noCleaners')}</p>
                     <button
                       onClick={() => setShowForm(true)}
-                      className="mt-2 text-rose-600 hover:text-rose-700 font-medium"
+                      className="mt-2 text-emerald-600 hover:text-emerald-700 font-medium"
                     >
-                      Добавить первого сотрудника →
+                      {cleanersT('addFirst')} →
                     </button>
                   </div>
                 </div>
@@ -401,7 +406,7 @@ export default function AdminCleaners() {
 
         {/* Footer Note */}
         <div className="mt-12 text-center text-xs text-gray-400 dark:text-gray-600">
-          <p>© 2026 Управление клинингом • Система управления сотрудниками</p>
+          <p>© 2026 CRM Cleaning Company • {cleanersT('title')}</p>
         </div>
       </div>
     </div>

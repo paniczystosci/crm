@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import { useTranslations } from 'next-intl'
 import { MessageBubble } from './chat/MessageBubble'
 import { MessageGroup } from './chat/MessageGroup'
 import { TypingIndicator } from './chat/TypingIndicator'
@@ -16,6 +17,9 @@ type OrderChatProps = {
 }
 
 export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) {
+  const t = useTranslations('common')
+  const chatT = useTranslations('chat')
+  
   const supabase = createClient()
   const [messages, setMessages] = useState<any[]>([])
   const [user, setUser] = useState<any>(null)
@@ -47,13 +51,8 @@ export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) 
     if (!user || !orderId) return
     
     try {
-      // Отмечаем сообщения как прочитанные
       await markMessagesAsRead(orderId, user.id)
-      
-      // Триггерим обновление глобального счетчика
-      // Отправляем событие для обновления useUnreadMessages
       window.dispatchEvent(new CustomEvent('refresh-unread'))
-      
       console.log('✅ Marked order as read:', orderId.slice(0, 8))
     } catch (error) {
       console.error('Error marking as read:', error)
@@ -64,10 +63,8 @@ export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) 
   useEffect(() => {
     if (!user || !orderId) return
     
-    // Отмечаем при открытии
     markCurrentOrderAsRead()
     
-    // Интервал для периодического обновления (пока чат открыт)
     const interval = setInterval(() => {
       if (document.hasFocus()) {
         markCurrentOrderAsRead()
@@ -85,7 +82,6 @@ export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) 
 
     const loadMessages = async () => {
       try {
-        // Загружаем историю сообщений
         const { data: existingMessages, error } = await supabase
           .from('order_messages')
           .select('*')
@@ -118,11 +114,9 @@ export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) 
             
             console.log('New message received:', payload.new)
             
-            // Добавляем новое сообщение
             setMessages(prev => [...prev, payload.new])
             scrollToBottom()
             
-            // Если чат в фокусе, отмечаем как прочитанное
             if (document.hasFocus()) {
               await markCurrentOrderAsRead()
             }
@@ -152,7 +146,6 @@ export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) 
     loadMessages()
     setupRealtime()
 
-    // Слушаем событие фокуса для обновления
     const handleFocus = () => {
       markCurrentOrderAsRead()
     }
@@ -184,7 +177,7 @@ export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) 
       <div className="flex items-center justify-center p-8">
         <div className="animate-pulse flex flex-col items-center gap-3">
           <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700"></div>
-          <div className="text-gray-400 text-sm">Загрузка чата...</div>
+          <div className="text-gray-400 text-sm">{t('loading')}</div>
         </div>
       </div>
     )
@@ -201,11 +194,11 @@ export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) 
           </div>
           <div>
             <div className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">
-              Чат по заказу
+              {chatT('title')}
             </div>
             <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
               <Users size={12} />
-              <span>{isAdmin ? 'Вы и клинер' : 'Вы и администратор'}</span>
+              <span>{isAdmin ? chatT('cleanerChat') : chatT('adminChat')}</span>
             </div>
           </div>
         </div>
@@ -219,10 +212,10 @@ export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) 
               <MessageCircle size={32} className="text-gray-400" />
             </div>
             <p className="text-gray-500 dark:text-gray-400 text-sm">
-              Нет сообщений
+              {chatT('noMessages')}
             </p>
             <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
-              Напишите первое сообщение
+              {chatT('startChat')}
             </p>
           </div>
         ) : (

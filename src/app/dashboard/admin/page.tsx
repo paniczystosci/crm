@@ -1,8 +1,10 @@
+// src/app/dashboard/admin/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation' // 👈 ДОБАВЛЕНО
+import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import NeoCard from '@/components/NeoCard'
 import { Users, ClipboardList, TrendingUp, DollarSign, AlertCircle, Package, Calendar, Wallet, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
@@ -16,6 +18,11 @@ type UnpaidDoneOrder = {
 }
 
 export default function AdminDashboard() {
+  const t = useTranslations('common')
+  const ordersT = useTranslations('orders')
+  const cleanersT = useTranslations('cleaners')
+  const paymentsT = useTranslations('payments')
+  
   const [stats, setStats] = useState({
     totalOrders: 0,
     todayOrders: 0,
@@ -26,12 +33,12 @@ export default function AdminDashboard() {
   const [unpaidDoneCount, setUnpaidDoneCount] = useState(0)
   const [unpaidDoneOrders, setUnpaidDoneOrders] = useState<UnpaidDoneOrder[]>([])
   const [loading, setLoading] = useState(true)
-  const [checkingRole, setCheckingRole] = useState(true) // 👈 ДОБАВЛЕНО
+  const [checkingRole, setCheckingRole] = useState(true)
 
   const supabase = createClient()
-  const router = useRouter() // 👈 ДОБАВЛЕНО
+  const router = useRouter()
 
-  // 👇 ПРОВЕРКА РОЛИ
+  // Проверка роли
   useEffect(() => {
     const checkRole = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -128,15 +135,15 @@ export default function AdminDashboard() {
   }
 
   const statCards = [
-    { label: 'Всего заказов', value: stats.totalOrders, icon: ClipboardList, color: 'from-blue-500 to-blue-600', bgColor: 'bg-blue-50 dark:bg-blue-950/30' },
-    { label: 'Сегодня', value: stats.todayOrders, icon: TrendingUp, color: 'from-emerald-500 to-emerald-600', bgColor: 'bg-emerald-50 dark:bg-emerald-950/30' },
-    { label: 'Клинеры', value: stats.activeCleaners, icon: Users, color: 'from-purple-500 to-purple-600', bgColor: 'bg-purple-50 dark:bg-purple-950/30' },
-    { label: 'Доход', value: `${stats.totalRevenue} zł`, icon: DollarSign, color: 'from-amber-500 to-amber-600', bgColor: 'bg-amber-50 dark:bg-amber-950/30' },
+    { label: ordersT('title'), value: stats.totalOrders, icon: ClipboardList, color: 'from-blue-500 to-blue-600', bgColor: 'bg-blue-50 dark:bg-blue-950/30' },
+    { label: ordersT('today'), value: stats.todayOrders, icon: TrendingUp, color: 'from-emerald-500 to-emerald-600', bgColor: 'bg-emerald-50 dark:bg-emerald-950/30' },
+    { label: cleanersT('title'), value: stats.activeCleaners, icon: Users, color: 'from-purple-500 to-purple-600', bgColor: 'bg-purple-50 dark:bg-purple-950/30' },
+    { label: paymentsT('title'), value: `${stats.totalRevenue} zł`, icon: DollarSign, color: 'from-amber-500 to-amber-600', bgColor: 'bg-amber-50 dark:bg-amber-950/30' },
   ]
 
   const quickActions = [
-    { title: 'Заказы', description: 'Просмотр и управление', emoji: '📋', href: '/dashboard/admin/orders', color: 'hover:border-blue-200 dark:hover:border-blue-800' },
-    { title: 'Клинеры', description: 'Команда и роли', emoji: '👥', href: '/dashboard/admin/cleaners', color: 'hover:border-purple-200 dark:hover:border-purple-800' },
+    { title: ordersT('title'), description: ordersT('manage'), emoji: '📋', href: '/dashboard/admin/orders', color: 'hover:border-blue-200 dark:hover:border-blue-800' },
+    { title: cleanersT('title'), description: cleanersT('manage'), emoji: '👥', href: '/dashboard/admin/cleaners', color: 'hover:border-purple-200 dark:hover:border-purple-800' },
   ]
 
   return (
@@ -149,9 +156,9 @@ export default function AdminDashboard() {
           </div>
           <div>
             <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
-              Админ‑панель
+              {t('adminPanel')}
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Управление системой</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{t('adminDescription')}</p>
           </div>
         </div>
       </div>
@@ -172,10 +179,10 @@ export default function AdminDashboard() {
                   <div className="flex flex-wrap justify-between items-start gap-2">
                     <div>
                       <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                        Невыплаченные заказы
+                        {paymentsT('unpaidOrders')}
                       </h2>
                       <p className="text-gray-600 dark:text-gray-300 mt-1">
-                        {unpaidDoneCount} заказ{unpaidDoneCount === 1 ? '' : unpaidDoneCount < 5 ? 'а' : 'ов'} ожидают выплаты клинерам
+                        {unpaidDoneCount} {unpaidDoneCount === 1 ? paymentsT('order') : paymentsT('orders')} {paymentsT('awaitingPayment')}
                       </p>
                     </div>
                     <Link
@@ -183,7 +190,7 @@ export default function AdminDashboard() {
                       className="group inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl transition-all duration-200 shadow-md hover:shadow-lg"
                     >
                       <Wallet size={18} />
-                      <span className="font-medium">Выплатить</span>
+                      <span className="font-medium">{paymentsT('payNow')}</span>
                       <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
                     </Link>
                   </div>
@@ -201,7 +208,7 @@ export default function AdminDashboard() {
                         </div>
                         <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                           <Users size={12} />
-                          <span>{order.profiles?.[0]?.full_name || 'Клинер не указан'}</span>
+                          <span>{order.profiles?.[0]?.full_name || cleanersT('notAssigned')}</span>
                         </div>
                         {order.planned_date && (
                           <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -259,7 +266,7 @@ export default function AdminDashboard() {
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
           <div className="h-1 w-8 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full"></div>
-          Быстрые действия
+          {t('quickActions')}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {quickActions.map((action, idx) => (
@@ -291,7 +298,7 @@ export default function AdminDashboard() {
 
       {/* Footer Note */}
       <div className="mt-12 text-center text-xs text-gray-400 dark:text-gray-600">
-        <p>© 2026 Управление клинингом • Все данные обновлены</p>
+        <p>© 2026 CRM Cleaning Company • {t('allRightsReserved')}</p>
       </div>
     </div>
   )

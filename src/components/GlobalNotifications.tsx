@@ -3,9 +3,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import { useTranslations } from 'next-intl'
 import { playNotificationSound } from '@/lib/supabase/playNotificationSound'
 
 export function GlobalNotifications() {
+  const t = useTranslations('chat')
   const supabase = createClient()
   const lastPlayRef = useRef<number>(0)
   const channelRef = useRef<any>(null)
@@ -62,8 +64,8 @@ export function GlobalNotifications() {
             .eq('id', payload.new.order_id)
             .single()
           
-          const notificationTitle = 'Новое сообщение в чате'
-          const notificationBody = `Заказ: ${order?.client_name || payload.new.order_id.slice(0, 8)}\n${payload.new.message?.slice(0, 100) || 'Новое сообщение'}`
+          const notificationTitle = t('newMessage')
+          const notificationBody = `${t('order')}: ${order?.client_name || payload.new.order_id.slice(0, 8)}\n${payload.new.message?.slice(0, 100) || t('newMessage')}`
           
           const notification = new Notification(notificationTitle, {
             body: notificationBody,

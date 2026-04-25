@@ -1,9 +1,11 @@
+// src/app/dashboard/cleaner/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { Calendar, MapPin, Phone, ArrowRight, Plus, Filter, Clock, User, DollarSign, AlertCircle } from 'lucide-react'
 import { UnreadBadge } from '@/components/UnreadBadge'
 
@@ -19,32 +21,11 @@ type Order = {
   created_at: string
 }
 
-const statusLabels: Record<Order['status'], string> = {
-  new: 'Новый',
-  accepted: 'Принят',
-  in_progress: 'В работе',
-  done: 'Завершён',
-  cancelled: 'Отменён',
-}
-
-const statusColors: Record<Order['status'], string> = {
-  new: 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
-  accepted: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300',
-  in_progress: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300',
-  done: 'bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300',
-  cancelled: 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300',
-}
-
-const statusIcons: Record<Order['status'], string> = {
-  new: '🆕',
-  accepted: '✅',
-  in_progress: '🔄',
-  done: '✔️',
-  cancelled: '❌',
-}
-
 export default function CleanerOrders() {
-  // Все хуки в начале компонента
+  const t = useTranslations('common')
+  const ordersT = useTranslations('orders')
+  const cleanersT = useTranslations('cleaners')
+  
   const [orders, setOrders] = useState<Order[]>([])
   const [filter, setFilter] = useState<Order['status'] | 'all'>('all')
   const [loading, setLoading] = useState(true)
@@ -55,7 +36,30 @@ export default function CleanerOrders() {
   const router = useRouter()
   const supabase = createClient()
 
-  // Единая проверка роли и загрузка данных
+  const statusLabels: Record<Order['status'], string> = {
+    new: ordersT('status.new'),
+    accepted: ordersT('status.accepted'),
+    in_progress: ordersT('status.in_progress'),
+    done: ordersT('status.done'),
+    cancelled: ordersT('status.cancelled'),
+  }
+
+  const statusColors: Record<Order['status'], string> = {
+    new: 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
+    accepted: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300',
+    in_progress: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300',
+    done: 'bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300',
+    cancelled: 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300',
+  }
+
+  const statusIcons: Record<Order['status'], string> = {
+    new: '🆕',
+    accepted: '✅',
+    in_progress: '🔄',
+    done: '✔️',
+    cancelled: '❌',
+  }
+
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -111,14 +115,14 @@ export default function CleanerOrders() {
 
       if (error) {
         console.error('Supabase error in fetchOrders:', error)
-        setError('Ошибка при загрузке заказов')
+        setError(ordersT('loadError'))
         setOrders([])
       } else {
         setOrders(data || [])
       }
     } catch (err) {
       console.error('Неожиданная ошибка:', err)
-      setError('Произошла ошибка при загрузке данных')
+      setError(ordersT('loadError'))
       setOrders([])
     } finally {
       setLoading(false)
@@ -130,7 +134,6 @@ export default function CleanerOrders() {
     return orders.filter(o => o.status === status).length
   }
 
-  // Показываем загрузку пока проверяем роль
   if (checkingRole) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -139,7 +142,6 @@ export default function CleanerOrders() {
     )
   }
 
-  // Основной рендер
   return (
     <div>
       {/* Header */}
@@ -151,11 +153,11 @@ export default function CleanerOrders() {
                 <Calendar size={20} className="text-white" />
               </div>
               <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
-                Мои заказы
+                {ordersT('title')}
               </h1>
             </div>
             <p className="text-gray-500 dark:text-gray-400 ml-13">
-              Управление вашими заданиями
+              {t('manageTasks')}
             </p>
           </div>
           
@@ -164,7 +166,7 @@ export default function CleanerOrders() {
             className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
           >
             <Plus size={18} />
-            <span>Новый заказ</span>
+            <span>{ordersT('new')}</span>
           </Link>
         </div>
       </div>
@@ -174,7 +176,7 @@ export default function CleanerOrders() {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-3 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-gray-500">Всего</p>
+              <p className="text-xs text-gray-500">{t('total')}</p>
               <p className="text-xl font-bold text-gray-900 dark:text-white">{orders.length}</p>
             </div>
             <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center">
@@ -186,7 +188,7 @@ export default function CleanerOrders() {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-3 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-gray-500">Новые</p>
+              <p className="text-xs text-gray-500">{ordersT('status.new')}</p>
               <p className="text-xl font-bold text-blue-600">{getStatusCount('new')}</p>
             </div>
             <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center">
@@ -198,7 +200,7 @@ export default function CleanerOrders() {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-3 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-gray-500">В работе</p>
+              <p className="text-xs text-gray-500">{ordersT('status.in_progress')}</p>
               <p className="text-xl font-bold text-amber-600">{getStatusCount('in_progress')}</p>
             </div>
             <div className="h-8 w-8 rounded-full bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center">
@@ -210,7 +212,7 @@ export default function CleanerOrders() {
         <div className="bg-white dark:bg-gray-800 rounded-xl p-3 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-gray-500">Завершено</p>
+              <p className="text-xs text-gray-500">{ordersT('status.done')}</p>
               <p className="text-xl font-bold text-green-600">{getStatusCount('done')}</p>
             </div>
             <div className="h-8 w-8 rounded-full bg-green-100 dark:bg-green-950/50 flex items-center justify-center">
@@ -224,12 +226,13 @@ export default function CleanerOrders() {
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-3">
           <Filter size={16} className="text-gray-400" />
-          <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Фильтр по статусу</span>
+          <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{ordersT('filterByStatus')}</span>
         </div>
         <div className="flex flex-wrap gap-2">
           {(['all', 'new', 'accepted', 'in_progress', 'done'] as const).map((status) => {
             const count = getStatusCount(status)
             const isActive = filter === status
+            const label = status === 'all' ? ordersT('allOrders') : statusLabels[status]
             return (
               <button
                 key={status}
@@ -242,7 +245,7 @@ export default function CleanerOrders() {
               >
                 <span className="flex items-center gap-1.5">
                   {status !== 'all' && <span>{statusIcons[status]}</span>}
-                  {status === 'all' ? 'Все заказы' : statusLabels[status]}
+                  {label}
                   {count > 0 && (
                     <span className={`ml-1 px-1.5 py-0.5 text-xs rounded-full ${
                       isActive 
@@ -265,7 +268,7 @@ export default function CleanerOrders() {
           <div className="relative">
             <div className="animate-spin rounded-full h-12 w-12 border-2 border-emerald-600 border-t-transparent"></div>
           </div>
-          <p className="mt-4 text-gray-500 dark:text-gray-400">Загрузка заказов...</p>
+          <p className="mt-4 text-gray-500 dark:text-gray-400">{t('loading')}</p>
         </div>
       ) : error ? (
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-12 text-center">
@@ -279,7 +282,7 @@ export default function CleanerOrders() {
                 onClick={fetchOrders}
                 className="mt-4 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium transition-colors"
               >
-                Попробовать снова
+                {t('tryAgain')}
               </button>
             </div>
           </div>
@@ -291,9 +294,9 @@ export default function CleanerOrders() {
               <Calendar size={40} className="text-gray-400" />
             </div>
             <div>
-              <p className="text-xl font-medium text-gray-900 dark:text-white">Заказов пока нет</p>
+              <p className="text-xl font-medium text-gray-900 dark:text-white">{ordersT('noOrders')}</p>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                {filter !== 'all' ? `Нет заказов со статусом "${statusLabels[filter]}"` : 'Создайте новый заказ'}
+                {filter !== 'all' ? `${ordersT('noOrders')} ${ordersT('status')} "${statusLabels[filter]}"` : ordersT('noOrders')}
               </p>
               {filter === 'all' && (
                 <Link
@@ -301,7 +304,7 @@ export default function CleanerOrders() {
                   className="inline-flex items-center gap-2 mt-4 text-emerald-600 hover:text-emerald-700 font-medium"
                 >
                   <Plus size={16} />
-                  Создать заказ
+                  {ordersT('new')}
                 </Link>
               )}
             </div>
@@ -371,7 +374,7 @@ export default function CleanerOrders() {
                 {/* Footer */}
                 <div className="px-5 py-3 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-700 flex justify-end">
                   <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-sm font-medium group-hover:gap-2 transition-all">
-                    Подробнее
+                    {ordersT('details')}
                     <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
                   </span>
                 </div>

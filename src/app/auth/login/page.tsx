@@ -4,9 +4,14 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { Eye, EyeOff, Mail, Lock, LogIn, Sparkles, CheckCircle } from 'lucide-react'
 
 export default function LoginPage() {
+  const t = useTranslations('auth')
+  const commonT = useTranslations('common')
+  const errorsT = useTranslations('errors')
+  
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -82,8 +87,8 @@ export default function LoginPage() {
           <div className="inline-flex p-4 bg-white/20 backdrop-blur-sm rounded-3xl mb-4 shadow-lg">
             <Sparkles size={40} className="text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">Pani Czystości</h1>
-          <p className="text-emerald-100 text-sm">Войдите в свою учетную запись</p>
+          <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">CRM CC</h1>
+          <p className="text-emerald-100 text-sm">{t('subtitle')}</p>
         </div>
 
         {/* Форма входа */}
@@ -108,12 +113,12 @@ export default function LoginPage() {
                 style={{
                   borderColor: emailFocused ? '#10b981' : '#e5e7eb',
                 }}
-                placeholder="Email"
+                placeholder={t('emailPlaceholder')}
               />
               <label className={`absolute left-11 -top-2.5 px-2 text-xs transition-all duration-200 bg-white rounded-full ${
                 emailFocused || email ? 'text-emerald-500 -translate-y-0' : 'text-gray-400 translate-y-0 opacity-0'
               }`}>
-                Email
+                {t('emailLabel')}
               </label>
             </div>
 
@@ -135,7 +140,7 @@ export default function LoginPage() {
                 style={{
                   borderColor: passwordFocused ? '#10b981' : '#e5e7eb',
                 }}
-                placeholder="Пароль"
+                placeholder={t('passwordPlaceholder')}
               />
               <button
                 type="button"
@@ -147,7 +152,7 @@ export default function LoginPage() {
               <label className={`absolute left-11 -top-2.5 px-2 text-xs transition-all duration-200 bg-white rounded-full ${
                 passwordFocused || password ? 'text-emerald-500 -translate-y-0' : 'text-gray-400 translate-y-0 opacity-0'
               }`}>
-                Пароль
+                {t('passwordLabel')}
               </label>
             </div>
 
@@ -170,7 +175,7 @@ export default function LoginPage() {
                   </div>
                 </div>
                 <span className="text-sm text-gray-600 cursor-pointer select-none">
-                  Запомнить меня
+                  {t('rememberMe')}
                 </span>
               </label>
             </div>
@@ -191,12 +196,12 @@ export default function LoginPage() {
               {loading ? (
                 <>
                   <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                  <span>Вход...</span>
+                  <span>{commonT('loading')}</span>
                 </>
               ) : (
                 <>
                   <LogIn size={18} />
-                  <span>Войти</span>
+                  <span>{commonT('login')}</span>
                 </>
               )}
             </button>
@@ -205,7 +210,7 @@ export default function LoginPage() {
           {/* Футер */}
           <div className="mt-8 pt-6 border-t border-gray-100">
             <p className="text-center text-xs text-gray-400">
-              © 2026 Pani Czystości. Все права защищены.
+              © 2026 CRM Cleaning Company. {t('footer')}
             </p>
           </div>
         </div>

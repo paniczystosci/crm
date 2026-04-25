@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { Calendar, Clock, User, DollarSign, Package, Filter, ChevronRight } from 'lucide-react'
 import { UnreadBadge } from '@/components/UnreadBadge'
 import { getUnreadCount } from '@/lib/supabase/markMessagesAsRead'
@@ -20,37 +21,41 @@ type Order = {
   profiles?: { full_name: string } | null
 }
 
-const statusLabels: Record<string, string> = {
-  new: 'Новый',
-  accepted: 'Принят',
-  in_progress: 'В работе',
-  done: 'Завершён',
-  cancelled: 'Отменён',
-}
-
-const statusColors: Record<string, string> = {
-  new: 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
-  accepted: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300',
-  in_progress: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300',
-  done: 'bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300',
-  cancelled: 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300',
-}
-
-const statusIcons: Record<string, string> = {
-  new: '🆕',
-  accepted: '✅',
-  in_progress: '🔄',
-  done: '✔️',
-  cancelled: '❌',
-}
-
 export default function AdminOrders() {
+  const t = useTranslations('common')
+  const ordersT = useTranslations('orders')
+  const cleanersT = useTranslations('cleaners')
+  
   const [orders, setOrders] = useState<Order[]>([])
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
 
   const supabase = createClient()
+
+  const statusLabels: Record<string, string> = {
+    new: ordersT('status.new'),
+    accepted: ordersT('status.accepted'),
+    in_progress: ordersT('status.in_progress'),
+    done: ordersT('status.done'),
+    cancelled: ordersT('status.cancelled'),
+  }
+
+  const statusColors: Record<string, string> = {
+    new: 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
+    accepted: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300',
+    in_progress: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300',
+    done: 'bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300',
+    cancelled: 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300',
+  }
+
+  const statusIcons: Record<string, string> = {
+    new: '🆕',
+    accepted: '✅',
+    in_progress: '🔄',
+    done: '✔️',
+    cancelled: '❌',
+  }
 
   useEffect(() => {
     const getUser = async () => {
@@ -101,23 +106,23 @@ export default function AdminOrders() {
                   <Package size={20} className="text-white" />
                 </div>
                 <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
-                  Все заказы
+                  {ordersT('title')}
                 </h1>
               </div>
               <p className="text-gray-500 dark:text-gray-400 ml-13">
-                Управление и отслеживание всех заказов
+                {ordersT('manage')}
               </p>
             </div>
             
             <div className="flex items-center gap-3 px-4 py-2 bg-white dark:bg-gray-800 rounded-2xl shadow-md">
               <div className="text-center">
                 <div className="text-2xl font-bold text-gray-900 dark:text-white">{orders.length}</div>
-                <div className="text-xs text-gray-500">всего</div>
+                <div className="text-xs text-gray-500">{t('total')}</div>
               </div>
               <div className="w-px h-8 bg-gray-200 dark:bg-gray-700"></div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-emerald-600">{getStatusCount('new') + getStatusCount('accepted')}</div>
-                <div className="text-xs text-gray-500">активных</div>
+                <div className="text-xs text-gray-500">{ordersT('active')}</div>
               </div>
             </div>
           </div>
@@ -127,25 +132,26 @@ export default function AdminOrders() {
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-3">
             <Filter size={16} className="text-gray-400" />
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Фильтр по статусу</span>
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{ordersT('filterByStatus')}</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {(['all', 'new', 'accepted', 'in_progress', 'done', 'cancelled'] as const).map((status) => {
               const count = getStatusCount(status)
               const isActive = filterStatus === status
+              const label = status === 'all' ? ordersT('allOrders') : statusLabels[status]
               return (
                 <button
                   key={status}
                   onClick={() => setFilterStatus(status)}
                   className={`group relative px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                     isActive
-                      ? 'bg-gradient-to-r from-rose-600 to-rose-500 text-white shadow-md'
+                      ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-md'
                       : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
                   }`}
                 >
                   <span className="flex items-center gap-2">
                     {status !== 'all' && <span>{statusIcons[status]}</span>}
-                    {status === 'all' ? 'Все заказы' : statusLabels[status]}
+                    {label}
                     {count > 0 && (
                       <span className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
                         isActive 
@@ -166,9 +172,9 @@ export default function AdminOrders() {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="relative">
-              <div className="animate-spin rounded-full h-12 w-12 border-2 border-rose-600 border-t-transparent"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-2 border-emerald-600 border-t-transparent"></div>
             </div>
-            <p className="mt-4 text-gray-500 dark:text-gray-400">Загрузка заказов...</p>
+            <p className="mt-4 text-gray-500 dark:text-gray-400">{t('loading')}</p>
           </div>
         ) : orders.length === 0 ? (
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-12 text-center">
@@ -177,9 +183,9 @@ export default function AdminOrders() {
                 <Package size={40} className="text-gray-400" />
               </div>
               <div>
-                <p className="text-lg font-medium text-gray-900 dark:text-white">Заказов не найдено</p>
+                <p className="text-lg font-medium text-gray-900 dark:text-white">{ordersT('noOrders')}</p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  {filterStatus !== 'all' ? `Нет заказов со статусом "${statusLabels[filterStatus]}"` : 'Список заказов пуст'}
+                  {filterStatus !== 'all' ? `${ordersT('noOrders')} ${ordersT('status')} "${statusLabels[filterStatus]}"` : ordersT('noOrders')}
                 </p>
               </div>
             </div>
@@ -244,7 +250,7 @@ export default function AdminOrders() {
                     <div className="flex items-center justify-between lg:justify-end gap-6 lg:border-l lg:border-gray-200 dark:lg:border-gray-700 lg:pl-6">
                       {order.profiles?.full_name && (
                         <div className="text-right">
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Клинер</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">{ordersT('cleaner')}</div>
                           <div className="flex items-center gap-2">
                             <div className="h-8 w-8 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
                               <span className="text-white text-xs font-medium">
@@ -258,8 +264,8 @@ export default function AdminOrders() {
                         </div>
                       )}
                       
-                      <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 font-medium group-hover:gap-3 transition-all">
-                        <span className="text-sm">Подробнее</span>
+                      <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-medium group-hover:gap-3 transition-all">
+                        <span className="text-sm">{ordersT('details')}</span>
                         <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
                       </div>
                     </div>
@@ -273,7 +279,7 @@ export default function AdminOrders() {
 
         {/* Footer Note */}
         <div className="mt-12 text-center text-xs text-gray-400 dark:text-gray-600">
-          <p>© 2024 Управление клинингом • Система управления заказами</p>
+          <p>© 2026 CRM Cleaning Company • {ordersT('title')}</p>
         </div>
       </div>
     </div>

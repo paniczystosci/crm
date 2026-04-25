@@ -1,6 +1,7 @@
 // src/components/chat/MessageGroup.tsx
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { MessageBubble } from './MessageBubble'
 
 type MessageGroupProps = {
@@ -10,19 +11,21 @@ type MessageGroupProps = {
 }
 
 export function MessageGroup({ date, messages, userId }: MessageGroupProps) {
+  const t = useTranslations('chat')
+  
   // Форматирование даты для отображения
   const formatDate = (dateStr: string) => {
     const today = new Date()
     const messageDate = new Date(dateStr)
     
     if (messageDate.toDateString() === today.toDateString()) {
-      return 'Сегодня'
+      return t('today')
     }
     
     const yesterday = new Date(today)
     yesterday.setDate(yesterday.getDate() - 1)
     if (messageDate.toDateString() === yesterday.toDateString()) {
-      return 'Вчера'
+      return t('yesterday')
     }
     
     return messageDate.toLocaleDateString('ru-RU', {

@@ -4,9 +4,14 @@
 import { useRef, useState } from 'react'
 import { sendMessage } from '@/lib/supabase/sendMessage'
 import { sendTyping } from '@/lib/supabase/sendTyping'
+import { useTranslations } from 'next-intl'
 import { Send, Loader2, Paperclip, X } from 'lucide-react'
 
 export function ChatInput({ orderId, user }: any) {
+  const t = useTranslations('common')
+  const chatT = useTranslations('chat')
+  const errorsT = useTranslations('errors')
+  
   const [text, setText] = useState('')
   const [uploading, setUploading] = useState(false)
   const [sending, setSending] = useState(false)
@@ -28,11 +33,11 @@ export function ChatInput({ orderId, user }: any) {
         if (fileRef.current) fileRef.current.value = ''
       } else {
         console.error('Failed to send message:', result.error)
-        alert('Не удалось отправить сообщение. Попробуйте еще раз.')
+        alert(errorsT('serverError'))
       }
     } catch (error) {
       console.error('Error in handleSend:', error)
-      alert('Ошибка при отправке сообщения')
+      alert(errorsT('serverError'))
     } finally {
       setSending(false)
     }
@@ -42,15 +47,13 @@ export function ChatInput({ orderId, user }: any) {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Проверка типа файла
     if (!file.type.startsWith('image/')) {
-      alert('Пожалуйста, выберите изображение')
+      alert(chatT('selectImage'))
       return
     }
 
-    // Проверка размера (максимум 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('Изображение не должно превышать 5MB')
+      alert(chatT('imageSizeLimit'))
       return
     }
 
@@ -102,7 +105,7 @@ export function ChatInput({ orderId, user }: any) {
           onClick={() => fileRef.current?.click()}
           disabled={uploading || sending}
           className="flex-shrink-0 p-2 sm:p-2.5 rounded-xl text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Прикрепить изображение"
+          title={chatT('attachImage')}
         >
           {uploading ? (
             <Loader2 size={18} className="animate-spin" />
@@ -122,7 +125,7 @@ export function ChatInput({ orderId, user }: any) {
             onKeyDown={handleKeyPress}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
-            placeholder="Напишите сообщение..."
+            placeholder={chatT('placeholder')}
             rows={1}
             disabled={sending}
             className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-sm bg-gray-50 dark:bg-gray-900 border-2 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all duration-200 resize-none disabled:opacity-50"
@@ -143,7 +146,7 @@ export function ChatInput({ orderId, user }: any) {
               ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md hover:shadow-lg transform active:scale-95'
               : 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
           }`}
-          title="Отправить сообщение"
+          title={chatT('send')}
         >
           {sending ? (
             <Loader2 size={18} className="animate-spin" />
@@ -165,11 +168,11 @@ export function ChatInput({ orderId, user }: any) {
       {/* Подсказка */}
       <div className="flex justify-between items-center mt-2 px-1">
         <p className="text-xs text-gray-400">
-          {sending ? 'Отправка...' : (text.trim() || selectedFile) ? '↵ Enter для отправки' : 'Enter — отправить'}
+          {sending ? t('loading') : (text.trim() || selectedFile) ? chatT('enterToSend') : chatT('enterHint')}
         </p>
         {text.length > 0 && (
           <p className="text-xs text-gray-400">
-            {text.length} симв.
+            {text.length} {chatT('characters')}
           </p>
         )}
       </div>

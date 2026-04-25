@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import { useTranslations } from 'next-intl'
 import { 
   LogOut, User, Menu, X, LayoutDashboard, ClipboardList, 
   Users, BarChart3, DollarSign, Plus, Wallet, Bell, Settings 
@@ -16,6 +17,10 @@ import { GlobalNotifications } from '@/components/GlobalNotifications'
 type Role = 'admin' | 'cleaner'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const t = useTranslations('common')
+  const navT = useTranslations('nav')
+  const settingsT = useTranslations('settings')
+  
   const [user, setUser] = useState<any>(null)
   const [role, setRole] = useState<Role | null>(null)
   const [loading, setLoading] = useState(true)
@@ -90,17 +95,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isAdmin = role === 'admin'
 
   const adminNavItems = [
-    { href: '/dashboard/admin', label: 'Главная', icon: LayoutDashboard, showNotification: false },
-    { href: '/dashboard/admin/orders', label: 'Заказы', icon: ClipboardList, showNotification: true },
-    { href: '/dashboard/admin/cleaners', label: 'Клинеры', icon: Users, showNotification: false },
-    { href: '/dashboard/admin/stats', label: 'Статистика', icon: BarChart3, showNotification: false },
-    { href: '/dashboard/admin/payments', label: 'Выплаты', icon: DollarSign, showNotification: false },
+    { href: '/dashboard/admin', label: navT('dashboard'), icon: LayoutDashboard, showNotification: false },
+    { href: '/dashboard/admin/orders', label: navT('orders'), icon: ClipboardList, showNotification: true },
+    { href: '/dashboard/admin/cleaners', label: navT('cleaners'), icon: Users, showNotification: false },
+    { href: '/dashboard/admin/stats', label: navT('stats'), icon: BarChart3, showNotification: false },
+    { href: '/dashboard/admin/payments', label: navT('payments'), icon: DollarSign, showNotification: false },
   ]
 
   const cleanerNavItems = [
-    { href: '/dashboard/cleaner', label: 'Мои заказы', icon: ClipboardList, showNotification: true },
-    { href: '/dashboard/cleaner/new', label: 'Новый заказ', icon: Plus, showNotification: false },
-    { href: '/dashboard/cleaner/cash', label: 'Касса', icon: Wallet, showNotification: false },
+    { href: '/dashboard/cleaner', label: navT('myOrders'), icon: ClipboardList, showNotification: true },
+    { href: '/dashboard/cleaner/new', label: navT('newOrder'), icon: Plus, showNotification: false },
+    { href: '/dashboard/cleaner/cash', label: navT('cash'), icon: Wallet, showNotification: false },
   ]
 
   const navItems = isAdmin ? adminNavItems : cleanerNavItems
@@ -126,11 +131,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="flex items-center gap-2">
               <img
                 src="/logo.png"
-                alt="Pani Czystości"
+                alt="CRM Cleaning Company"
                 className="h-10 md:h-12 object-contain"
               />
               <div className="hidden sm:block text-sm text-gray-500 dark:text-gray-400">
-                {isAdmin ? 'Админ-панель' : 'Панель клинера'}
+                {isAdmin ? t('adminPanel') : t('cleanerPanel')}
               </div>
             </div>
           </div>
@@ -164,7 +169,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <User size={14} className="text-white" />
                 </div>
                 <span className="hidden md:block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {user?.email?.split('@')[0] || 'Профиль'}
+                  {user?.email?.split('@')[0] || t('profile')}
                 </span>
               </button>
               
@@ -172,7 +177,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50 overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                     <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                      {user?.email?.split('@')[0] || 'Пользователь'}
+                      {user?.email?.split('@')[0] || t('user')}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                       {user?.email}
@@ -188,7 +193,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     }}
                   >
                     <Settings size={16} />
-                    <span>Настройки</span>
+                    <span>{settingsT('title')}</span>
                   </Link>
                   
                   <button
@@ -196,7 +201,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors border-t border-gray-100 dark:border-gray-700 mt-1"
                   >
                     <LogOut size={16} />
-                    <span>Выйти из аккаунта</span>
+                    <span>{t('logout')}</span>
                   </button>
                 </div>
               )}
@@ -216,14 +221,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-lg">П</span>
+                <span className="text-white font-bold text-lg">C</span>
               </div>
               <div>
                 <h2 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
-                  Pani Czystości
+                  {t('companyName')}
                 </h2>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  {isAdmin ? 'Администратор' : 'Клинер'}
+                  {isAdmin ? t('admin') : t('cleaner')}
                 </p>
               </div>
             </div>
@@ -243,7 +248,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-gray-900 dark:text-white truncate">
-                  {user?.email?.split('@')[0] || 'Пользователь'}
+                  {user?.email?.split('@')[0] || t('user')}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                   {user?.email}
@@ -302,7 +307,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               }`}
             >
               <Settings size={20} className={pathname === '/dashboard/settings' ? 'text-white' : 'text-gray-500 group-hover:text-emerald-500'} />
-              <span className="font-medium flex-1">Настройки</span>
+              <span className="font-medium flex-1">{settingsT('title')}</span>
               {pathname === '/dashboard/settings' && (
                 <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
               )}
@@ -318,12 +323,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           >
             <div className="absolute inset-0 w-0 bg-white/20 transition-all duration-300 group-hover:w-full"></div>
             <LogOut size={20} className="relative z-10" />
-            <span className="relative z-10">Выйти из аккаунта</span>
+            <span className="relative z-10">{t('logout')}</span>
           </button>
 
           <div className="px-4 pt-4 text-center">
-            <p className="text-xs text-gray-400">© 2026 Pani Czystości</p>
-            <p className="text-xs text-gray-400 mt-0.5">Версия 2.0.0</p>
+            <p className="text-xs text-gray-400">© 2026 {t('companyName')}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{t('version')}</p>
           </div>
         </div>
       </div>

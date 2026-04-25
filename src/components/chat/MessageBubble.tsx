@@ -2,9 +2,11 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Image, Download, User } from 'lucide-react'
 
 export function MessageBubble({ msg, isMine }: any) {
+  const t = useTranslations('chat')
   const [imageLoaded, setImageLoaded] = useState(false)
 
   const handleImageClick = () => {
@@ -100,7 +102,7 @@ export function MessageBubble({ msg, isMine }: any) {
           <div className={`text-[10px] mt-1.5 ${isMine ? 'text-emerald-100' : 'text-gray-500 dark:text-gray-400'}`}>
             {formatTime(msg.created_at)}
             {msg.is_edited && (
-              <span className="ml-1 text-[9px] opacity-70">(ред.)</span>
+              <span className="ml-1 text-[9px] opacity-70">({t('edited')})</span>
             )}
           </div>
         </div>

@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useParams, useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import OrderChat from '@/components/OrderChat'
 import { 
   Calendar, 
@@ -42,31 +43,14 @@ type Order = {
   is_incassed?: boolean
 }
 
-const statusLabels: Record<string, string> = {
-  new: 'Новый',
-  accepted: 'Принят',
-  in_progress: 'В работе',
-  done: 'Завершён',
-  cancelled: 'Отменён',
-}
-
-const statusColors: Record<string, string> = {
-  new: 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
-  accepted: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300',
-  in_progress: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300',
-  done: 'bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300',
-  cancelled: 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300',
-}
-
-const statusIcons: Record<string, string> = {
-  new: '🆕',
-  accepted: '✅',
-  in_progress: '🔄',
-  done: '✔️',
-  cancelled: '❌',
-}
-
 export default function CleanerOrderDetail() {
+  const t = useTranslations('common')
+  const ordersT = useTranslations('orders')
+  const cashT = useTranslations('cash')
+  const paymentsT = useTranslations('payments')
+  const chatT = useTranslations('chat')
+  const errorsT = useTranslations('errors')
+  
   const { id } = useParams() as { id: string }
   const router = useRouter()
 
@@ -80,6 +64,30 @@ export default function CleanerOrderDetail() {
   const [clientGiven, setClientGiven] = useState(0)
 
   const supabase = createClient()
+
+  const statusLabels: Record<string, string> = {
+    new: ordersT('status.new'),
+    accepted: ordersT('status.accepted'),
+    in_progress: ordersT('status.in_progress'),
+    done: ordersT('status.done'),
+    cancelled: ordersT('status.cancelled'),
+  }
+
+  const statusColors: Record<string, string> = {
+    new: 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
+    accepted: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300',
+    in_progress: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300',
+    done: 'bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300',
+    cancelled: 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300',
+  }
+
+  const statusIcons: Record<string, string> = {
+    new: '🆕',
+    accepted: '✅',
+    in_progress: '🔄',
+    done: '✔️',
+    cancelled: '❌',
+  }
 
   useEffect(() => {
     fetchOrder()
@@ -104,13 +112,13 @@ export default function CleanerOrderDetail() {
         .single()
 
       if (error || !data) {
-        setError('Заказ не найден или у вас нет доступа')
+        setError(errorsT('orderNotFound'))
       } else {
         setOrder(data)
         setClientGiven(data.price)
       }
     } catch (err) {
-      setError('Ошибка загрузки данных')
+      setError(errorsT('loadError'))
     } finally {
       setLoading(false)
     }
@@ -147,9 +155,9 @@ export default function CleanerOrderDetail() {
       .eq('id', id)
 
     if (error) {
-      alert('Ошибка при приёме оплаты: ' + error.message)
+      alert(`${errorsT('serverError')}: ${error.message}`)
     } else {
-      alert('Оплата успешно принята! Заказ завершён.')
+      alert(paymentsT('paidMessage'))
       setShowPaymentForm(false)
       fetchOrder()
     }
@@ -158,11 +166,11 @@ export default function CleanerOrderDetail() {
   const getNextAction = () => {
     switch (order?.status) {
       case 'new':
-        return { label: 'Принять заказ', status: 'accepted', color: 'emerald', icon: CheckCircle }
+        return { label: ordersT('accept'), status: 'accepted', color: 'emerald', icon: CheckCircle }
       case 'accepted':
-        return { label: 'Начать уборку', status: 'in_progress', color: 'amber', icon: ClockIcon }
+        return { label: ordersT('start'), status: 'in_progress', color: 'amber', icon: ClockIcon }
       case 'in_progress':
-        return { label: 'Завершить уборку и принять оплату', status: 'done', color: 'green', icon: Sparkles, action: () => setShowPaymentForm(true) }
+        return { label: ordersT('completeAndPay'), status: 'done', color: 'green', icon: Sparkles, action: () => setShowPaymentForm(true) }
       default:
         return null
     }
@@ -176,7 +184,7 @@ export default function CleanerOrderDetail() {
         <div className="relative">
           <div className="animate-spin rounded-full h-12 w-12 border-2 border-emerald-600 border-t-transparent"></div>
         </div>
-        <p className="mt-4 text-gray-500 dark:text-gray-400">Загрузка заказа...</p>
+        <p className="mt-4 text-gray-500 dark:text-gray-400">{t('loading')}</p>
       </div>
     )
   }
@@ -188,12 +196,12 @@ export default function CleanerOrderDetail() {
           <div className="h-16 w-16 rounded-full bg-red-100 dark:bg-red-950/30 flex items-center justify-center mx-auto mb-4">
             <AlertCircle size={32} className="text-red-500" />
           </div>
-          <p className="text-red-500 mb-6 text-lg">{error || 'Заказ не найден'}</p>
+          <p className="text-red-500 mb-6 text-lg">{error || errorsT('notFound')}</p>
           <button
             onClick={() => router.push('/dashboard/cleaner')}
             className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-medium transition-all duration-200"
           >
-            Вернуться к моим заказам
+            {ordersT('backToOrders')}
           </button>
         </div>
       </div>
@@ -211,7 +219,7 @@ export default function CleanerOrderDetail() {
           className="inline-flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors mb-4 group"
         >
           <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-          <span>Назад к заказам</span>
+          <span>{ordersT('backToOrders')}</span>
         </Link>
         
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -221,11 +229,11 @@ export default function CleanerOrderDetail() {
                 <span className="text-white font-bold text-lg">#</span>
               </div>
               <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
-                Заказ {order.id.slice(0, 8).toUpperCase()}
+                {ordersT('title')} {order.id.slice(0, 8).toUpperCase()}
               </h1>
             </div>
             <p className="text-gray-500 dark:text-gray-400 ml-13">
-              Клиент: <span className="font-medium text-gray-700 dark:text-gray-300">{order.client_name}</span>
+              {ordersT('client')}: <span className="font-medium text-gray-700 dark:text-gray-300">{order.client_name}</span>
             </p>
           </div>
           
@@ -243,21 +251,21 @@ export default function CleanerOrderDetail() {
           <div className="p-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
             <h2 className="font-semibold text-lg flex items-center gap-2">
               <User size={20} className="text-emerald-500" />
-              Данные клиента
+              {ordersT('client')}
             </h2>
           </div>
           <div className="p-5 space-y-4">
             <div className="flex items-start gap-3">
               <Phone size={18} className="text-gray-400 mt-0.5" />
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">Телефон</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wider">{ordersT('phone')}</p>
                 <p className="font-medium text-gray-900 dark:text-white mt-0.5">{order.client_phone}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <MapPin size={18} className="text-gray-400 mt-0.5" />
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">Адрес</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wider">{ordersT('address')}</p>
                 <p className="font-medium text-gray-900 dark:text-white mt-0.5">{order.address}</p>
                 {order.google_maps_link && (
                   <a 
@@ -267,7 +275,7 @@ export default function CleanerOrderDetail() {
                     className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 text-sm mt-2 transition-colors"
                   >
                     <ExternalLink size={14} />
-                    Открыть в Google Maps
+                    {t('openInMaps')}
                   </a>
                 )}
               </div>
@@ -276,21 +284,21 @@ export default function CleanerOrderDetail() {
         </div>
 
         {/* Order Details */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-black-700 overflow-hidden">
-          <div className="p-5 border-b border-gray-200 dark:border-black-700 bg-gradient-to-r from-gray-50 to-white dark:from-black-800 dark:to-black-800">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="p-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
             <h2 className="font-semibold text-lg flex items-center gap-2">
               <DollarSign size={20} className="text-emerald-500" />
-              Детали заказа
+              {ordersT('details')}
             </h2>
           </div>
           <div className="p-5 space-y-4">
-            <div className="flex justify-between items-center pb-3 border-b border-gray-100 dark:border-black-700">
-              <span className="text-black-500">Сумма</span>
+            <div className="flex justify-between items-center pb-3 border-b border-gray-100 dark:border-gray-700">
+              <span className="text-gray-500">{ordersT('price')}</span>
               <span className="font-bold text-2xl text-emerald-600 dark:text-emerald-400">{order.price} zł</span>
             </div>
             {order.planned_date && (
               <div className="flex justify-between items-center">
-                <span className="text-gray-500">Дата и время</span>
+                <span className="text-gray-500">{ordersT('plannedDate')}</span>
                 <span className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
                   <Calendar size={16} className="text-gray-400" />
                   {new Date(order.planned_date).toLocaleDateString('ru-RU')}
@@ -305,7 +313,7 @@ export default function CleanerOrderDetail() {
             )}
             {order.comment && (
               <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-950/20 rounded-xl">
-                <p className="text-xs text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-2">Комментарий</p>
+                <p className="text-xs text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-2">{ordersT('comment')}</p>
                 <p className="italic text-gray-700 dark:text-gray-300">{order.comment}</p>
               </div>
             )}
@@ -324,7 +332,7 @@ export default function CleanerOrderDetail() {
             {updating ? (
               <>
                 <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                <span>Обновление...</span>
+                <span>{t('loading')}</span>
               </>
             ) : (
               <>
@@ -343,7 +351,7 @@ export default function CleanerOrderDetail() {
             <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-5 flex justify-between items-center">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                 <Wallet size={22} className="text-emerald-500" />
-                Приём оплаты
+                {paymentsT('title')}
               </h2>
               <button
                 onClick={() => setShowPaymentForm(false)}
@@ -356,14 +364,14 @@ export default function CleanerOrderDetail() {
             <div className="p-6 space-y-6">
               {/* Order Total */}
               <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-xl p-4 text-center">
-                <p className="text-sm text-gray-600 dark:text-gray-400">Сумма заказа</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{ordersT('price')}</p>
                 <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{order.price} zł</p>
               </div>
 
               {/* Payment Type */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  Способ оплаты
+                  {t('paymentMethod')}
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
@@ -375,7 +383,7 @@ export default function CleanerOrderDetail() {
                     }`}
                   >
                     <Coins size={18} />
-                    Наличные
+                    {t('cash')}
                   </button>
                   <button
                     onClick={() => setPaymentType('bank')}
@@ -386,7 +394,7 @@ export default function CleanerOrderDetail() {
                     }`}
                   >
                     <Landmark size={18} />
-                    На счёт
+                    {t('bank')}
                   </button>
                 </div>
               </div>
@@ -396,7 +404,7 @@ export default function CleanerOrderDetail() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Сколько дал клиент
+                      {t('clientGiven')}
                     </label>
                     <div className="relative">
                       <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
@@ -414,7 +422,7 @@ export default function CleanerOrderDetail() {
                   
                   <div className={`p-4 rounded-xl ${change > 0 ? 'bg-amber-50 dark:bg-amber-950/30' : 'bg-green-50 dark:bg-green-950/30'}`}>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600 dark:text-gray-400">Сдача:</span>
+                      <span className="text-gray-600 dark:text-gray-400">{t('change')}:</span>
                       <span className={`font-bold text-xl ${change > 0 ? 'text-amber-600' : 'text-green-600'}`}>
                         {change.toFixed(2)} zł
                       </span>
@@ -428,10 +436,10 @@ export default function CleanerOrderDetail() {
                 <div className="bg-blue-50 dark:bg-blue-950/30 rounded-xl p-5 text-center">
                   <Landmark size={32} className="text-blue-500 mx-auto mb-2" />
                   <p className="text-blue-700 dark:text-blue-300 font-medium">
-                    Полная сумма {order.price} zł
+                    {t('totalAmount')} {order.price} zł
                   </p>
                   <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
-                    будет зачислена на счёт фирмы
+                    {t('bankTransferInfo')}
                   </p>
                 </div>
               )}
@@ -443,13 +451,13 @@ export default function CleanerOrderDetail() {
                   className="flex-1 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold rounded-xl transition-all duration-200 transform active:scale-[0.98] shadow-md flex items-center justify-center gap-2"
                 >
                   <CheckCircle size={18} />
-                  Принять оплату
+                  {t('acceptPayment')}
                 </button>
                 <button
                   onClick={() => setShowPaymentForm(false)}
                   className="flex-1 py-3.5 rounded-xl border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
                 >
-                  Отмена
+                  {t('cancel')}
                 </button>
               </div>
             </div>
@@ -464,7 +472,7 @@ export default function CleanerOrderDetail() {
 
       {/* Footer Note */}
       <div className="mt-8 text-center text-xs text-gray-400 dark:text-gray-600">
-        <p>© 2026 Управление клинингом • Заказ #{order.id.slice(0, 8).toUpperCase()}</p>
+        <p>© 2026 CRM Cleaning Company • {ordersT('title')} #{order.id.slice(0, 8).toUpperCase()}</p>
       </div>
     </div>
   )

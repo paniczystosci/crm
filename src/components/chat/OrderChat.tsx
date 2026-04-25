@@ -10,6 +10,7 @@ import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
 import { subscribeToMessages } from '@/lib/supabase/subscribeToMessages'
 import { MessageCircle, Users } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 type OrderChatProps = {
   orderId: string
@@ -17,9 +18,10 @@ type OrderChatProps = {
 }
 
 export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) {
-
+  const t = useTranslations('common')
+  const chatT = useTranslations('chat')
+  
   const supabase = createClient()
-
   const [messages, setMessages] = useState<any[]>([])
   const [user, setUser] = useState<any>(null)
   const [typingUser, setTypingUser] = useState<string | null>(null)
@@ -89,7 +91,7 @@ export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) 
     <div className="flex items-center justify-center p-8">
       <div className="animate-pulse flex flex-col items-center gap-3">
         <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700"></div>
-        <div className="text-gray-400 text-sm">Загрузка чата...</div>
+        <div className="text-gray-400 text-sm">{t('loading')}</div>
       </div>
     </div>
   )
@@ -105,11 +107,11 @@ export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) 
           </div>
           <div>
             <div className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">
-              Чат по заказу
+              {chatT('title')}
             </div>
             <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
               <Users size={12} />
-              <span>{isAdmin ? 'Вы и клинер' : 'Вы и администратор'}</span>
+              <span>{isAdmin ? chatT('cleanerChat') : chatT('adminChat')}</span>
             </div>
           </div>
         </div>
@@ -123,10 +125,10 @@ export default function OrderChat({ orderId, isAdmin = false }: OrderChatProps) 
               <MessageCircle size={32} className="text-gray-400" />
             </div>
             <p className="text-gray-500 dark:text-gray-400 text-sm">
-              Нет сообщений
+              {chatT('noMessages')}
             </p>
             <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
-              Напишите первое сообщение
+              {chatT('startChat')}
             </p>
           </div>
         ) : (

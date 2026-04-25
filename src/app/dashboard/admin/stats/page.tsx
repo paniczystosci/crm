@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import { useTranslations } from 'next-intl'
 import {
   LineChart,
   Line,
@@ -37,6 +38,7 @@ type RecentPayout = {
   cleaner_name: string
   amount: number
   paid_at: string
+  
 }
 
 const statusColorsMap = {
@@ -48,6 +50,12 @@ const statusColorsMap = {
 }
 
 export default function AdminStats() {
+  const t = useTranslations('common')
+  const statsT = useTranslations('stats')
+  const ordersT = useTranslations('orders')
+  const paymentsT = useTranslations('payments')
+  const cleanersT = useTranslations('cleaners')
+  
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([])
   const [statusData, setStatusData] = useState<StatusData[]>([])
   const [totalRevenue, setTotalRevenue] = useState(0)
@@ -64,90 +72,105 @@ export default function AdminStats() {
   }, [])
 
   async function fetchStatistics() {
-    setLoading(true)
+  setLoading(true)
 
-    const { data: orders } = await supabase
-      .from('orders')
-      .select(`
-        id,
-        price,
-        status,
-        created_at,
-        client_name,
-        cleaner_id,
-        salary_value,
-        is_paid_to_cleaner,
-        paid_at,
-        profiles!cleaner_id (full_name)
-      `)
-      .in('status', ['done', 'accepted', 'in_progress'])
+  // 1. Получаем заказы
+  const { data: orders } = await supabase
+    .from('orders')
+    .select(`
+      id,
+      price,
+      status,
+      created_at,
+      client_name,
+      cleaner_id,
+      salary_value,
+      is_paid_to_cleaner,
+      paid_at
+    `)
+    .in('status', ['done', 'accepted', 'in_progress'])
 
-    const ordersList = orders || []
+  const ordersList = orders || []
 
-    const gross = ordersList.reduce((sum, o) => sum + (o.price || 0), 0)
-    setTotalRevenue(gross)
-    setTotalOrders(ordersList.length)
+  // 2. Получаем всех клинеров (для сопоставления имен)
+  const { data: cleaners } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+    .eq('role', 'cleaner')
 
-    const paidOrders = ordersList.filter(
-      (o) => o.is_paid_to_cleaner && o.salary_value !== null && o.salary_value > 0
-    )
-    const payoutsSum = paidOrders.reduce((sum, o) => sum + (o.salary_value || 0), 0)
-    setTotalPayouts(payoutsSum)
-    setNetRevenue(gross - payoutsSum)
+  // Создаем карту { cleaner_id: full_name }
+  const cleanerMap = new Map()
+  cleaners?.forEach(cleaner => {
+    cleanerMap.set(cleaner.id, cleaner.full_name)
+  })
 
-    const recent = paidOrders
-      .sort((a, b) => new Date(b.paid_at!).getTime() - new Date(a.paid_at!).getTime())
-      .slice(0, 8)
-      .map((o) => ({
-        order_id: o.id,
-        client_name: o.client_name,
-        cleaner_name: o.profiles?.[0]?.full_name || 'Неизвестный клинер',
-        amount: o.salary_value!,
-        paid_at: o.paid_at!,
-      }))
-    setRecentPayouts(recent)
+  const gross = ordersList.reduce((sum, o) => sum + (o.price || 0), 0)
+  setTotalRevenue(gross)
+  setTotalOrders(ordersList.length)
 
-    const monthlyMap = new Map<string, { revenue: number; orders: number }>()
-    ordersList.forEach((order) => {
-      const date = new Date(order.created_at)
-      const monthKey = date.toLocaleString('ru-RU', { month: 'short', year: 'numeric' })
+  const paidOrders = ordersList.filter(
+    (o) => o.is_paid_to_cleaner && o.salary_value !== null && o.salary_value > 0
+  )
+  const payoutsSum = paidOrders.reduce((sum, o) => sum + (o.salary_value || 0), 0)
+  setTotalPayouts(payoutsSum)
+  setNetRevenue(gross - payoutsSum)
 
-      if (!monthlyMap.has(monthKey)) {
-        monthlyMap.set(monthKey, { revenue: 0, orders: 0 })
-      }
-      const current = monthlyMap.get(monthKey)!
-      current.revenue += order.price || 0
-      current.orders += 1
-    })
+  // 3. Формируем список последних выплат с именами из карты
+  const recent = paidOrders
+    .sort((a, b) => new Date(b.paid_at!).getTime() - new Date(a.paid_at!).getTime())
+    .slice(0, 8)
+    .map((o) => ({
+      order_id: o.id,
+      client_name: o.client_name,
+      cleaner_name: cleanerMap.get(o.cleaner_id) || 'Неизвестный клинер',
+      amount: o.salary_value!,
+      paid_at: o.paid_at!,
+    }))
+    
+  setRecentPayouts(recent)
 
-    const sortedMonthly = Array.from(monthlyMap.entries())
-      .map(([month, data]) => ({ month, ...data }))
-      .sort((a, b) => a.month.localeCompare(b.month))
-      .slice(-6)
+  // Остальной код (месячная статистика, pie chart и т.д.) без изменений
+  const monthlyMap = new Map<string, { revenue: number; orders: number }>()
+  ordersList.forEach((order) => {
+    const date = new Date(order.created_at)
+    const monthKey = date.toLocaleString('ru-RU', { month: 'short', year: 'numeric' })
 
-    setMonthlyData(sortedMonthly)
+    if (!monthlyMap.has(monthKey)) {
+      monthlyMap.set(monthKey, { revenue: 0, orders: 0 })
+    }
+    const current = monthlyMap.get(monthKey)!
+    current.revenue += order.price || 0
+    current.orders += 1
+  })
 
-    const statusCount = ordersList.reduce((acc: any, order) => {
-      acc[order.status] = (acc[order.status] || 0) + 1
-      return acc
-    }, {})
+  const sortedMonthly = Array.from(monthlyMap.entries())
+    .map(([month, data]) => ({ month, ...data }))
+    .sort((a, b) => a.month.localeCompare(b.month))
+    .slice(-6)
 
-    const pieData: StatusData[] = [
-      { name: 'Завершён', value: statusCount.done || 0, color: statusColorsMap.done },
-      { name: 'В работе', value: statusCount.in_progress || 0, color: statusColorsMap.in_progress },
-      { name: 'Принят', value: statusCount.accepted || 0, color: statusColorsMap.accepted },
-      { name: 'Новый', value: statusCount.new || 0, color: statusColorsMap.new },
-    ].filter((item) => item.value > 0)
+  setMonthlyData(sortedMonthly)
 
-    setStatusData(pieData)
-    setLoading(false)
-  }
+  const statusCount = ordersList.reduce((acc: any, order) => {
+    acc[order.status] = (acc[order.status] || 0) + 1
+    return acc
+  }, {})
+
+  const pieData: StatusData[] = [
+    { name: ordersT('status.done'), value: statusCount.done || 0, color: statusColorsMap.done },
+    { name: ordersT('status.in_progress'), value: statusCount.in_progress || 0, color: statusColorsMap.in_progress },
+    { name: ordersT('status.accepted'), value: statusCount.accepted || 0, color: statusColorsMap.accepted },
+    { name: ordersT('status.new'), value: statusCount.new || 0, color: statusColorsMap.new },
+  ].filter((item) => item.value > 0)
+
+  setStatusData(pieData)
+  setLoading(false)
+}
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
         <div className="relative">
-          <div className="animate-spin rounded-full h-12 w-12 border-2 border-rose-600 border-t-transparent"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-2 border-emerald-600 border-t-transparent"></div>
         </div>
       </div>
     )
@@ -166,11 +189,11 @@ export default function AdminStats() {
               <TrendingUp size={20} className="text-white" />
             </div>
             <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
-              Статистика и отчёты
+              {statsT('title')}
             </h1>
           </div>
           <p className="text-gray-500 dark:text-gray-400 ml-13">
-            Доходы, выплаты и анализ эффективности
+            {statsT('revenue')}, {paymentsT('title')} {t('and')} {statsT('revenueChart')}
           </p>
         </div>
 
@@ -184,9 +207,9 @@ export default function AdminStats() {
               </div>
               <TrendingUp size={20} className="text-emerald-500" />
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Валовой доход</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">{statsT('grossRevenue')}</p>
             <p className="text-3xl font-bold text-gray-900 dark:text-white">{totalRevenue} zł</p>
-            <p className="text-xs text-gray-400 mt-2">за все время</p>
+            <p className="text-xs text-gray-400 mt-2">{statsT('allTime')}</p>
           </div>
 
           {/* Payouts */}
@@ -197,9 +220,9 @@ export default function AdminStats() {
               </div>
               <TrendingDown size={20} className="text-rose-500" />
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Выплачено клинерам</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">{statsT('payouts')}</p>
             <p className="text-3xl font-bold text-rose-600 dark:text-rose-400">-{totalPayouts} zł</p>
-            <p className="text-xs text-gray-400 mt-2">выплаченные суммы</p>
+            <p className="text-xs text-gray-400 mt-2">{statsT('paidAmount')}</p>
           </div>
 
           {/* Net Revenue */}
@@ -212,9 +235,9 @@ export default function AdminStats() {
                 </div>
                 <span className="text-white/80 text-sm font-medium">+{netRevenuePercent}%</span>
               </div>
-              <p className="text-emerald-100 text-sm mb-1">Чистый доход</p>
+              <p className="text-emerald-100 text-sm mb-1">{statsT('netRevenue')}</p>
               <p className="text-4xl font-bold text-white">{netRevenue} zł</p>
-              <p className="text-emerald-200 text-xs mt-2">после выплат клинерам</p>
+              <p className="text-emerald-200 text-xs mt-2">{statsT('afterPayouts')}</p>
             </div>
           </div>
 
@@ -226,9 +249,9 @@ export default function AdminStats() {
               </div>
               <Calendar size={20} className="text-blue-500" />
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Всего заказов</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">{statsT('totalOrders')}</p>
             <p className="text-3xl font-bold text-gray-900 dark:text-white">{totalOrders}</p>
-            <p className="text-xs text-gray-400 mt-2">выполненных и активных</p>
+            <p className="text-xs text-gray-400 mt-2">{statsT('completedAndActive')}</p>
           </div>
         </div>
 
@@ -237,7 +260,7 @@ export default function AdminStats() {
           <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <Wallet size={20} className="text-rose-500" />
-              Последние выплаты клинерам
+              {statsT('recentPayouts')}
             </h2>
           </div>
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -245,7 +268,7 @@ export default function AdminStats() {
               <div className="p-12 text-center">
                 <div className="inline-flex flex-col items-center gap-3">
                   <Wallet size={48} className="text-gray-400" />
-                  <p className="text-gray-500 dark:text-gray-400">Пока нет выплат</p>
+                  <p className="text-gray-500 dark:text-gray-400">{statsT('noData')}</p>
                 </div>
               </div>
             ) : (
@@ -265,7 +288,7 @@ export default function AdminStats() {
                       <div>
                         <div className="font-semibold text-gray-900 dark:text-white">{p.cleaner_name}</div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
-                          Заказ #{p.order_id.slice(0, 8).toUpperCase()} — {p.client_name}
+                          {ordersT('title')} #{p.order_id.slice(0, 8).toUpperCase()} — {p.client_name}
                         </div>
                       </div>
                     </div>
@@ -288,7 +311,7 @@ export default function AdminStats() {
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
               <TrendingUp size={20} className="text-emerald-500" />
-              Доход и количество заказов по месяцам
+              {statsT('revenueChart')}
             </h2>
             <ResponsiveContainer width="100%" height={380}>
               <LineChart data={monthlyData}>
@@ -310,7 +333,7 @@ export default function AdminStats() {
                   dataKey="revenue"
                   stroke="#e11d48"
                   strokeWidth={3}
-                  name="Доход (zł)"
+                  name={statsT('revenue')}
                   dot={{ fill: '#e11d48', strokeWidth: 2 }}
                 />
                 <Line
@@ -319,7 +342,7 @@ export default function AdminStats() {
                   dataKey="orders"
                   stroke="#3b82f6"
                   strokeWidth={3}
-                  name="Заказы"
+                  name={ordersT('title')}
                   dot={{ fill: '#3b82f6', strokeWidth: 2 }}
                 />
               </LineChart>
@@ -330,7 +353,7 @@ export default function AdminStats() {
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
               <Package size={20} className="text-purple-500" />
-              Количество заказов по месяцам
+              {statsT('ordersChart')}
             </h2>
             <ResponsiveContainer width="100%" height={380}>
               <BarChart data={monthlyData}>
@@ -355,7 +378,7 @@ export default function AdminStats() {
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6 mb-8">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
             <TrendingUp size={20} className="text-orange-500" />
-            Распределение заказов по статусам
+            {statsT('statusDistribution')}
           </h2>
           <div className="flex flex-col lg:flex-row items-center justify-center gap-8">
             <div className="w-full lg:w-1/2">
@@ -400,7 +423,7 @@ export default function AdminStats() {
 
         {/* Footer Note */}
         <div className="text-center text-xs text-gray-400 dark:text-gray-600">
-          <p>© 2026 Управление клинингом • Аналитика и отчёты</p>
+          <p>© 2026 CRM Cleaning Company • {statsT('title')}</p>
         </div>
       </div>
     </div>
