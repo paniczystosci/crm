@@ -1,12 +1,11 @@
-// middleware.ts
+// src/middleware.ts
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  const res = NextResponse.next({
+  let supabaseResponse = NextResponse.next({
     request,
-    headers: request.headers,
   })
 
   const supabase = createServerClient(
@@ -19,31 +18,52 @@ export async function middleware(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) =>
-            res.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, options)
           )
         },
       },
     }
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  const isAuthPage = request.nextUrl.pathname.startsWith('/auth')
-  const isDashboard = request.nextUrl.pathname.startsWith('/dashboard')
+  const { data: { user } } = await supabase.auth.getUser()
+  const pathname = request.nextUrl.pathname
 
   // Если пользователь не авторизован и пытается зайти в дашборд
-  if (!user && isDashboard) {
+  if (!user && pathname.startsWith('/dashboard')) {
     return NextResponse.redirect(new URL('/auth/login', request.url))
   }
 
-  // Если пользователь авторизован и пытается зайти на страницу auth
-  if (user && isAuthPage) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+  // Если пользователь авторизован
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    
+    const isAdmin = profile?.role === 'admin'
+
+    // Если пользователь на главной дашборда - редирект по роли
+    if (pathname === '/dashboard') {
+      if (isAdmin) {
+        return NextResponse.redirect(new URL('/dashboard/admin', request.url))
+      } else {
+        return NextResponse.redirect(new URL('/dashboard/cleaner', request.url))
+      }
+    }
+
+    // Защита: клинер не может зайти в админ-панель
+    if (!isAdmin && pathname.startsWith('/dashboard/admin')) {
+      return NextResponse.redirect(new URL('/dashboard/cleaner', request.url))
+    }
+
+    // Защита: админ не может зайти в панель клинера
+    if (isAdmin && pathname.startsWith('/dashboard/cleaner')) {
+      return NextResponse.redirect(new URL('/dashboard/admin', request.url))
+    }
   }
 
-  return res
+  return supabaseResponse
 }
 
 export const config = {

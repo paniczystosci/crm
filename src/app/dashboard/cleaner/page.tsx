@@ -1,4 +1,3 @@
-// src/app/dashboard/cleaner/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -7,7 +6,6 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Calendar, MapPin, Phone, ArrowRight, Plus, Filter, Clock, User, DollarSign, AlertCircle } from 'lucide-react'
 import { UnreadBadge } from '@/components/UnreadBadge'
-import { getUnreadCount } from '@/lib/supabase/markMessagesAsRead'
 
 type Order = {
   id: string
@@ -46,23 +44,45 @@ const statusIcons: Record<Order['status'], string> = {
 }
 
 export default function CleanerOrders() {
+  // Все хуки в начале компонента
   const [orders, setOrders] = useState<Order[]>([])
   const [filter, setFilter] = useState<Order['status'] | 'all'>('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [checkingRole, setCheckingRole] = useState(true)
 
   const router = useRouter()
   const supabase = createClient()
 
+  // Единая проверка роли и загрузка данных
   useEffect(() => {
-    const getUser = async () => {
+    const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      setUserId(user?.id || null)
+      
+      if (!user) {
+        router.push('/auth/login')
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      if (profile?.role === 'admin') {
+        router.replace('/dashboard/admin')
+        return
+      }
+      
+      setUserId(user.id)
+      setCheckingRole(false)
+      await fetchOrders()
     }
-    getUser()
-    fetchOrders()
-  }, [filter])
+
+    init()
+  }, [])
 
   async function fetchOrders() {
     setLoading(true)
@@ -110,6 +130,16 @@ export default function CleanerOrders() {
     return orders.filter(o => o.status === status).length
   }
 
+  // Показываем загрузку пока проверяем роль
+  if (checkingRole) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-2 border-emerald-600 border-t-transparent"></div>
+      </div>
+    )
+  }
+
+  // Основной рендер
   return (
     <div>
       {/* Header */}

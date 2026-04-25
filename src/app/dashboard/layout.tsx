@@ -4,7 +4,10 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { LogOut, User, Menu, X, Sun, Moon, LayoutDashboard, ClipboardList, Users, BarChart3, DollarSign, Plus, Wallet, Bell, Settings } from 'lucide-react'
+import { 
+  LogOut, User, Menu, X, LayoutDashboard, ClipboardList, 
+  Users, BarChart3, DollarSign, Plus, Wallet, Bell, Settings 
+} from 'lucide-react'
 import Link from 'next/link'
 import { useUnreadMessages } from '@/hooks/useUnreadMessages'
 import { NotificationSound } from '@/components/NotificationSound'
@@ -17,15 +20,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [role, setRole] = useState<Role | null>(null)
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [isDark, setIsDark] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+
   const { totalUnread } = useUnreadMessages()
 
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
 
-  // Закрывать меню при клике вне
+  // Закрытие user menu при клике вне
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (userMenuOpen && !(e.target as Element).closest('.user-menu')) {
@@ -36,25 +39,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => document.removeEventListener('click', handleClickOutside)
   }, [userMenuOpen])
 
-  // Проверяем соединение с Supabase Realtime
-  useEffect(() => {
-    const checkConnection = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        console.log('✅ User authenticated, realtime should work')
-      }
-    }
-    checkConnection()
-  }, [])
-
-  // Обновляем счетчик при переходе на страницу заказов
-  useEffect(() => {
-    if (pathname.includes('/orders')) {
-      const event = new CustomEvent('refresh-unread')
-      window.dispatchEvent(event)
-    }
-  }, [pathname])
-
+  // Загрузка пользователя и роли
   useEffect(() => {
     async function loadUser() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -70,38 +55,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         .eq('id', user.id)
         .single()
 
-      if (profile) setRole(profile.role as Role)
+      if (profile) {
+        setRole(profile.role as Role)
+      }
       setLoading(false)
     }
     loadUser()
-
-    const isDarkMode = document.documentElement.classList.contains('dark')
-    setIsDark(isDarkMode)
   }, [router, supabase])
+
+  // Защита роутов — перенаправление при несоответствии роли
+  useEffect(() => {
+    if (!role) return
+
+    if (role === 'cleaner' && pathname.startsWith('/dashboard/admin')) {
+      router.replace('/dashboard/cleaner')
+    } else if (role === 'admin' && pathname.startsWith('/dashboard/cleaner')) {
+      router.replace('/dashboard/admin')
+    }
+  }, [role, pathname, router])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/auth/login')
   }
 
-  const toggleTheme = () => {
-    const newTheme = !isDark
-    setIsDark(newTheme)
-    if (newTheme) {
-      document.documentElement.classList.add('dark')
-      localStorage.setItem('theme', 'dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-      localStorage.setItem('theme', 'light')
-    }
-  }
-
-  if (loading) {
+  if (loading || !role) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
-        <div className="relative">
-          <div className="animate-spin rounded-full h-12 w-12 border-2 border-emerald-600 border-t-transparent"></div>
-        </div>
+        <div className="animate-spin rounded-full h-12 w-12 border-2 border-emerald-600 border-t-transparent"></div>
       </div>
     )
   }
@@ -127,7 +108,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       
-      {/* Компонент для звуковых уведомлений */}
+      {/* Уведомления */}
       <GlobalNotifications />
       <NotificationSound />
 
@@ -155,16 +136,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Иконка уведомлений в топ-баре */}
+            {/* Уведомления */}
             <div className="relative">
               <button 
-                onClick={() => {
-                  if (isAdmin) {
-                    router.push('/dashboard/admin/orders')
-                  } else {
-                    router.push('/dashboard/cleaner')
-                  }
-                }}
+                onClick={() => router.push(isAdmin ? '/dashboard/admin/orders' : '/dashboard/cleaner')}
                 className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
               >
                 <Bell size={20} className="text-gray-700 dark:text-gray-300" />
@@ -179,7 +154,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </button>
             </div>
 
-            {/* Выпадающее меню пользователя */}
+            {/* User Menu */}
             <div className="relative user-menu">
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
@@ -299,7 +274,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <Icon size={20} className={isActive ? 'text-white' : 'text-gray-500 group-hover:text-emerald-500'} />
                 <span className="font-medium flex-1">{item.label}</span>
                 
-                {/* Бейдж с количеством непрочитанных сообщений */}
                 {showNotification && (
                   <div className="relative">
                     <div className="bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center shadow-lg animate-pulse">
@@ -316,7 +290,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )
           })}
 
-          {/* Разделитель и ссылка на настройки в сайдбаре */}
+          {/* Настройки */}
           <div className="pt-4 mt-2 border-t border-gray-200 dark:border-gray-700">
             <Link
               href="/dashboard/settings"
@@ -336,24 +310,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </nav>
 
-{/* Sidebar Footer - только кнопка выхода */}
-<div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-  {/* Logout Button */}
-  <button
-    onClick={handleLogout}
-    className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white font-medium transition-all duration-200 transform active:scale-[0.98] shadow-md relative overflow-hidden group"
-  >
-    <div className="absolute inset-0 w-0 bg-white/20 transition-all duration-300 group-hover:w-full"></div>
-    <LogOut size={20} className="relative z-10" />
-    <span className="relative z-10">Выйти из аккаунта</span>
-  </button>
+        {/* Sidebar Footer */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white font-medium transition-all duration-200 transform active:scale-[0.98] shadow-md relative overflow-hidden group"
+          >
+            <div className="absolute inset-0 w-0 bg-white/20 transition-all duration-300 group-hover:w-full"></div>
+            <LogOut size={20} className="relative z-10" />
+            <span className="relative z-10">Выйти из аккаунта</span>
+          </button>
 
-  {/* Version */}
-  <div className="px-4 pt-4 text-center">
-    <p className="text-xs text-gray-400">© 2026 Pani Czystości</p>
-    <p className="text-xs text-gray-400 mt-0.5">Версия 2.0.0</p>
-  </div>
-</div>
+          <div className="px-4 pt-4 text-center">
+            <p className="text-xs text-gray-400">© 2026 Pani Czystości</p>
+            <p className="text-xs text-gray-400 mt-0.5">Версия 2.0.0</p>
+          </div>
+        </div>
       </div>
 
       {sidebarOpen && (
