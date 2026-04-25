@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { getUnreadCount } from '@/lib/supabase/markMessagesAsRead'
-import { MessageCircle } from 'lucide-react'
 
 type UnreadBadgeProps = {
   orderId: string
@@ -26,7 +25,9 @@ export function UnreadBadge({ orderId, userId }: UnreadBadgeProps) {
       if (!uid || !mounted) return
 
       const count = await getUnreadCount(orderId, uid)
-      if (mounted) setUnreadCount(count)
+      if (mounted) {
+        setUnreadCount(count)
+      }
     }
 
     loadCount()
@@ -35,11 +36,11 @@ export function UnreadBadge({ orderId, userId }: UnreadBadgeProps) {
       .channel(`unread-badge-${orderId}`)
       .on(
         'postgres_changes',
-        { 
-          event: 'INSERT', 
-          schema: 'public', 
+        {
+          event: 'INSERT',
+          schema: 'public',
           table: 'order_messages',
-          filter: `order_id=eq.${orderId}` 
+          filter: `order_id=eq.${orderId}`,
         },
         loadCount
       )
@@ -54,7 +55,7 @@ export function UnreadBadge({ orderId, userId }: UnreadBadgeProps) {
   if (unreadCount <= 0) return null
 
   return (
-    <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-5 px-1.5 flex items-center justify-center shadow">
+    <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-5 px-1.5 flex items-center justify-center shadow-lg z-10">
       {unreadCount > 99 ? '99+' : unreadCount}
     </div>
   )

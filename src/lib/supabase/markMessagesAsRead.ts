@@ -17,7 +17,7 @@ export async function markMessagesAsRead(orderId: string, userId: string) {
   if (error) {
     console.error('Error marking messages as read:', error)
   } else {
-    console.log(`✅ Marked as read: ${orderId.slice(0,8)}`)
+    console.log(`✅ Marked as read: ${orderId.slice(0, 8)}`)
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('refresh-unread'))
     }
@@ -27,18 +27,12 @@ export async function markMessagesAsRead(orderId: string, userId: string) {
 export async function getUnreadCount(orderId: string, userId: string): Promise<number> {
   const supabase = createClient()
 
-  // ← КРИТИЧНО: используем maybeSingle()
-  const { data: readData, error: readError } = await supabase
+  const { data: readData } = await supabase
     .from('order_chat_reads')
     .select('last_read_at')
     .eq('order_id', orderId)
     .eq('user_id', userId)
     .maybeSingle()
-
-  if (readError) {
-    console.error('Read error:', readError)
-    return 0
-  }
 
   const lastReadAt = readData?.last_read_at || new Date(0).toISOString()
 
@@ -50,7 +44,7 @@ export async function getUnreadCount(orderId: string, userId: string): Promise<n
     .gt('created_at', lastReadAt)
 
   if (error) {
-    console.error('Unread count error:', error)
+    console.error('Error getting unread count:', error)
     return 0
   }
 
