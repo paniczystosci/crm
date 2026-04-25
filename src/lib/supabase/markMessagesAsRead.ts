@@ -9,15 +9,15 @@ export async function markMessagesAsRead(orderId: string, userId: string) {
     .upsert({
       order_id: orderId,
       user_id: userId,
-      last_read_at: new Date().toISOString()
-    }, {
-      onConflict: 'order_id,user_id'   // важно: без пробелов
+      last_read_at: new Date().toISOString(),
+    }, { 
+      onConflict: 'order_id,user_id' 
     })
-  
+
   if (error) {
     console.error('Error marking messages as read:', error)
   } else {
-    console.log('✅ Messages marked as read for order:', orderId.slice(0, 8))
+    console.log(`✅ Marked as read: ${orderId.slice(0,8)}`)
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('refresh-unread'))
     }
@@ -26,8 +26,8 @@ export async function markMessagesAsRead(orderId: string, userId: string) {
 
 export async function getUnreadCount(orderId: string, userId: string): Promise<number> {
   const supabase = createClient()
-  
-  // Используем .maybeSingle() вместо .single() — возвращает null, если строки нет
+
+  // ← КРИТИЧНО: используем maybeSingle()
   const { data: readData, error: readError } = await supabase
     .from('order_chat_reads')
     .select('last_read_at')
@@ -36,7 +36,7 @@ export async function getUnreadCount(orderId: string, userId: string): Promise<n
     .maybeSingle()
 
   if (readError) {
-    console.error('Error fetching last_read_at:', readError)
+    console.error('Read error:', readError)
     return 0
   }
 
@@ -50,9 +50,9 @@ export async function getUnreadCount(orderId: string, userId: string): Promise<n
     .gt('created_at', lastReadAt)
 
   if (error) {
-    console.error('Error getting unread count:', error)
+    console.error('Unread count error:', error)
     return 0
   }
-  
+
   return count || 0
 }
