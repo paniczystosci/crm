@@ -10,6 +10,7 @@ import { Calendar, MapPin, Phone, ArrowRight, Plus, Filter, Clock, User, DollarS
 import { UnreadBadge } from '@/components/UnreadBadge'
 
 type Order = {
+  duration: string | null
   id: string
   client_name: string
   client_phone: string
@@ -363,6 +364,16 @@ export default function CleanerOrders() {
                         </span>
                       </div>
                     )}
+
+                    {/* Длительность уборки */}
+{order.planned_time && order.duration && (
+  <div className="flex items-center gap-2.5">
+    <Clock size={16} className="text-gray-400 flex-shrink-0" />
+    <span className="text-gray-600 dark:text-gray-400">
+      {order.planned_time.slice(0, 5)} • {order.duration} {t('minutes')}
+    </span>
+  </div>
+)}
 
                     <div className="flex items-center gap-2.5">
                       <Phone size={16} className="text-gray-400 flex-shrink-0" />

@@ -17,6 +17,7 @@ export default function AdminOrderDetail() {
   const cleanersT = useTranslations('cleaners')
   const errorsT = useTranslations('errors')
   const settingsT = useTranslations('settings')
+  const notificationsT = useTranslations('notifications')
   
   const { id } = useParams() as { id: string }
   const [order, setOrder] = useState<Order | null>(null)
@@ -108,7 +109,48 @@ export default function AdminOrderDetail() {
         planned_time: editForm.planned_time || null,
       })
       .eq('id', id)
+    
+    // Отправляем push-уведомление клинеру при назначении
+    if (editForm.cleaner_id && editForm.cleaner_id !== order?.cleaner_id) {
+      await fetch('/api/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: editForm.cleaner_id,
+          title: notificationsT('orderAssigned'),
+          body: `${order?.client_name} - ${editForm.price} zł`,
+          url: `/dashboard/cleaner/orders/${id}`,
+          orderId: id
+        })
+      })
+    }
+    
     setIsEditing(false)
+    fetchOrder()
+  }
+
+  // Функция для изменения статуса с отправкой уведомления
+  const updateStatus = async (newStatus: string) => {
+    await supabase
+      .from('orders')
+      .update({ status: newStatus })
+      .eq('id', id)
+    
+    // Отправляем push-уведомление клинеру
+    if (order?.cleaner_id) {
+      await fetch('/api/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: order.cleaner_id,
+          title: notificationsT('statusChanged'),
+          body: `${notificationsT('order')} ${order.client_name} - ${statusLabels[newStatus]}`,
+          url: `/dashboard/cleaner/orders/${id}`,
+          orderId: id
+        })
+      })
+    }
+    
     fetchOrder()
   }
 
@@ -155,7 +197,7 @@ export default function AdminOrderDetail() {
           </div>
         </div>
 
-        {/* Основная информация */}
+        {/* Основная информация (без изменений) */}
         <div className="grid lg:grid-cols-2 gap-6 mb-8">
           {/* Данные клиента */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">

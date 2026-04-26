@@ -1,6 +1,7 @@
 // src/app/layout.tsx
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
+import Script from 'next/script' // 👈 Импортируем Script
 import './globals.css'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import { NextIntlClientProvider } from 'next-intl'
@@ -9,7 +10,6 @@ import { cookies } from 'next/headers'
 
 const inter = Inter({ subsets: ['latin'] })
 
-// Динамические мета-теги для языков
 export async function generateMetadata(): Promise<Metadata> {
   const cookieStore = await cookies()
   const locale = cookieStore.get('locale')?.value || 'ru'
@@ -21,19 +21,30 @@ export async function generateMetadata(): Promise<Metadata> {
     de: 'CRM Cleaning Company | Reinigungsunternehmensverwaltung',
   }
   
-  const descriptions: Record<string, string> = {
-    ru: 'Профессиональная CRM система для управления клининговой компанией. Заказы, клинеры, выплаты, статистика.',
-    pl: 'Profesjonalny system CRM do zarządzania firmą sprzątającą. Zamówienia, sprzątacze, płatności, statystyki.',
-    en: 'Professional CRM system for cleaning company management. Orders, cleaners, payments, statistics.',
-    de: 'Professionelles CRM-System für die Verwaltung von Reinigungsunternehmen. Aufträge, Reinigungskräfte, Zahlungen, Statistiken.',
-  }
-  
   return {
     title: titles[locale] || titles.ru,
-    description: descriptions[locale] || descriptions.ru,
+    description: 'Professional CRM system for cleaning company management',
     icons: {
       icon: '/favicon.ico',
+      apple: '/icons/icon-152x152.png',
     },
+    manifest: '/manifest.json',
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: 'black-translucent',
+      title: 'CRM Cleaning',
+    },
+  }
+}
+
+export async function generateViewport(): Promise<Viewport> {
+  return {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+    viewportFit: 'cover',
+    themeColor: '#10b981',
   }
 }
 
@@ -45,7 +56,6 @@ export default async function RootLayout({
   const cookieStore = await cookies()
   let locale = cookieStore.get('locale')?.value || 'ru'
   
-  // Валидация локали (без notFound)
   const validLocales = ['ru', 'pl', 'en', 'de']
   if (!validLocales.includes(locale)) {
     locale = 'ru'
@@ -55,7 +65,36 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} suppressHydrationWarning>
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/icons/icon-152x152.png" />
+        <link rel="apple-touch-startup-image" href="/icons/icon-512x512.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="CRM Cleaning" />
+        <meta name="theme-color" content="#10b981" />
+        <meta name="mobile-web-app-capable" content="yes" />
+      </head>
       <body className={inter.className}>
+        {/* ✅ Правильный способ подключения Service Worker через Script компонент */}
+        <Script
+          id="service-worker-registration"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js').then(function(registration) {
+                    console.log('ServiceWorker registration successful');
+                  }, function(err) {
+                    console.log('ServiceWorker registration failed: ', err);
+                  });
+                });
+              }
+            `,
+          }}
+        />
+        
         <NextIntlClientProvider locale={locale} messages={messages}>
           <ThemeProvider>
             {children}

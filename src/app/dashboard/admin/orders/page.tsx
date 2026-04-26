@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
-import { Calendar, Clock, User, DollarSign, Package, Filter, ChevronRight } from 'lucide-react'
+import { Calendar, Clock, User, DollarSign, Package, Filter, ChevronRight, Timer } from 'lucide-react'
 import { UnreadBadge } from '@/components/UnreadBadge'
 import { getUnreadCount } from '@/lib/supabase/markMessagesAsRead'
 
@@ -17,6 +17,7 @@ type Order = {
   status: string
   planned_date?: string
   planned_time?: string
+  duration?: number
   cleaner_id?: string
   profiles?: { full_name: string } | null
 }
@@ -50,11 +51,11 @@ export default function AdminOrders() {
   }
 
   const statusIcons: Record<string, string> = {
-    new: '🆕',
-    accepted: '✅',
-    in_progress: '🔄',
-    done: '✔️',
-    cancelled: '❌',
+    new: '',
+    accepted: '',
+    in_progress: '',
+    done: '',
+    cancelled: '',
   }
 
   useEffect(() => {
@@ -91,6 +92,16 @@ export default function AdminOrders() {
   const getStatusCount = (status: string) => {
     if (status === 'all') return orders.length
     return orders.filter(o => o.status === status).length
+  }
+
+  // Функция форматирования длительности
+  const formatDuration = (minutes?: number) => {
+    if (!minutes) return ''
+    if (minutes >= 60) {
+      const hours = minutes / 60
+      return `${hours} ${t('hours')}`
+    }
+    return `${minutes} ${t('minutes')}`
   }
 
   return (
@@ -185,7 +196,7 @@ export default function AdminOrders() {
               <div>
                 <p className="text-lg font-medium text-gray-900 dark:text-white">{ordersT('noOrders')}</p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  {filterStatus !== 'all' ? `${ordersT('noOrders')} ${ordersT('status')} "${statusLabels[filterStatus]}"` : ordersT('noOrders')}
+                  {filterStatus !== 'all' ? `${ordersT('noOrders')} со статусом "${statusLabels[filterStatus]}"` : ordersT('noOrders')}
                 </p>
               </div>
             </div>
@@ -236,6 +247,16 @@ export default function AdminOrders() {
                                 <span>{order.planned_time.slice(0, 5)}</span>
                               </>
                             )}
+                          </div>
+                        )}
+                        
+                        {/* Длительность уборки */}
+                        {order.duration && (
+                          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                            <Timer size={16} className="text-gray-400" />
+                            <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                              {formatDuration(order.duration)}
+                            </span>
                           </div>
                         )}
                         

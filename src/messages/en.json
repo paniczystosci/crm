@@ -1,5 +1,6 @@
 {
   "common": {
+    "bankTransferInfo": "will be credited to the company account",
     "login": "Login",
     "logout": "Logout",
     "save": "Save",
@@ -40,7 +41,11 @@
     "acceptPayment": "Accept payment",
     "and": "and",
     "googleMaps": "Google Maps link (optional)",
-    "optional": "optional"
+    "optional": "optional",
+    "noAvailableSlots": "No available slots for the selected date",
+    "loadingSlots": "Loading available slots...",
+    "hours": "h",
+    "minutes": "min"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -50,7 +55,8 @@
     "stats": "Statistics",
     "myOrders": "My Orders",
     "newOrder": "New Order",
-    "cash": "Cash Register"
+    "cash": "Cash Register",
+    "calendar": "Calendar"
   },
   "auth": {
     "subtitle": "Login to your account",
@@ -103,7 +109,17 @@
     "complete": "Complete cleaning",
     "completeAndPay": "Complete cleaning and accept payment",
     "loadError": "Error loading orders",
-    "timeAt": "at"
+    "timeAt": "at",
+    "duration": "Cleaning duration",
+    "timeConflict": "Selected time conflicts with another order. Please choose a different time.",
+    "durationOptions": {
+      "30": "30 minutes",
+      "60": "1 hour",
+      "90": "1.5 hours",
+      "120": "2 hours",
+      "180": "3 hours",
+      "240": "4 hours"
+    }
   },
   "cleaners": {
     "title": "Team",
@@ -207,6 +223,7 @@
     "ordersAwaiting": "Orders awaiting collection"
   },
   "settings": {
+    "edit": "Edit",
     "title": "Settings",
     "password": "Change Password",
     "currentPassword": "Current Password",
@@ -233,5 +250,59 @@
     "orderNotFound": "Order not found",
     "accessDenied": "You don't have access to this order",
     "loadError": "Error loading data"
+  },
+    "calendar": {
+    "title": "Order Calendar",
+    "description": "Visual planning and order management",
+    "filterByCleaner": "Cleaner",
+    "allCleaners": "All cleaners",
+    "timeConflict": "This time slot is already taken by another order!",
+    "updateError": "Error updating date",
+    "duration": "Duration",
+    "dragHint": "Drag orders with the mouse to change date and time"
+  },
+  "notifications": {
+    "newOrder": "🆕 New order",
+    "title": "Notifications",
+    "pushNotifications": "Push notifications",
+    "pushDescription": "Receive notifications about new orders even when the site is closed",
+    "on": "Notifications on",
+    "off": "Notifications off",
+    "enable": "Enable notifications",
+    "disable": "Disable notifications",
+    "blocked": "Notifications blocked",
+    "blockedHelp": "To enable notifications, click the lock icon 🔒 next to the URL and allow notifications.",
+    "browserNotSupported": "Your browser does not support push notifications",
+    "permissionRequired": "Notification permission required",
+    "notConfigured": "Push notifications not configured. Please contact administrator.",
+    "enabled": "Notifications enabled!",
+    "disabled": "Notifications disabled!",
+    "enableError": "Error enabling notifications",
+    "disableError": "Error disabling notifications",
+    "statusChanged": "Order status changed",
+    "orderAssigned": "Order assigned to you",
+    "paymentReceived": "Payment received"
+  },
+   "pwa": {
+    "title": "Install App",
+    "description": "Install CRM Cleaning Company on your phone or computer",
+    "benefits": "Fast access, offline work, push notifications",
+    "install": "Install",
+    "dismiss": "Not now",
+    "installTitle": "Install app?",
+    "installDescription": "Install the app for quick access and convenient work",
+    "installApp": "Install app",
+    "iosStep1": "Tap the Share button",
+    "iosStep1Desc": "In the bottom bar of the browser, tap the Share icon",
+    "iosStep2": "Select «Add to Home Screen»",
+    "iosStep2Desc": "Scroll down and tap «Add to Home Screen»",
+    "iosStep3": "Tap «Add»",
+    "iosStep3Desc": "Confirm the app installation",
+    "androidStep1": "Tap the browser menu",
+    "androidStep1Desc": "In the top right corner, tap three dots",
+    "androidStep2": "Select «Install app»",
+    "androidStep2Desc": "Tap «Install» and confirm",
+    "desktopSupport": "Click the install icon in the address bar",
+    "desktopHint": "Supported on Chrome, Edge, Firefox"
   }
 }

@@ -5,8 +5,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { Calendar, Clock, Loader2, User, Phone, MapPin, Link2, MessageSquare, DollarSign, ArrowLeft, CheckCircle } from 'lucide-react'
+import { Calendar, Clock, Loader2, User, Phone, MapPin, Link2, MessageSquare, DollarSign, ArrowLeft, CheckCircle, Timer } from 'lucide-react'
 import Link from 'next/link'
+import { TimeSlotGrid } from '@/components/TimeSlotGrid'
 
 type FormData = {
   client_name: string
@@ -17,6 +18,7 @@ type FormData = {
   price: string
   planned_date: string
   planned_time: string
+  duration: string
 }
 
 export default function NewOrderPage() {
@@ -24,6 +26,7 @@ export default function NewOrderPage() {
   const ordersT = useTranslations('orders')
   const chatT = useTranslations('chat')
   const errorsT = useTranslations('errors')
+  const notificationsT = useTranslations('notifications')
   
   const [form, setForm] = useState<FormData>({
     client_name: '',
@@ -34,6 +37,7 @@ export default function NewOrderPage() {
     price: '',
     planned_date: '',
     planned_time: '',
+    duration: '60',
   })
 
   const [availableTimes, setAvailableTimes] = useState<string[]>([])
@@ -44,29 +48,56 @@ export default function NewOrderPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    if (form.planned_date) {
-      loadAvailableTimes(form.planned_date)
+    if (form.planned_date && form.duration) {
+      loadAvailableTimes(form.planned_date, parseInt(form.duration))
     } else {
       setAvailableTimes([])
     }
-  }, [form.planned_date])
+  }, [form.planned_date, form.duration])
 
-  async function loadAvailableTimes(date: string) {
+  function isTimeOverlap(
+    newStart: string,
+    newDuration: number,
+    existingStart: string,
+    existingDuration: number
+  ): boolean {
+    const [newHours, newMinutes] = newStart.split(':').map(Number)
+    const newStartMinutes = newHours * 60 + newMinutes
+    const newEndMinutes = newStartMinutes + newDuration
+
+    const [existingHours, existingMinutes] = existingStart.split(':').map(Number)
+    const existingStartMinutes = existingHours * 60 + existingMinutes
+    const existingEndMinutes = existingStartMinutes + existingDuration
+
+    return newStartMinutes < existingEndMinutes && newEndMinutes > existingStartMinutes
+  }
+
+  async function loadAvailableTimes(date: string, duration: number) {
     setLoading(true)
-    const { data: occupied } = await supabase
+    
+    const { data: existingOrders } = await supabase
       .from('orders')
-      .select('planned_time')
+      .select('planned_time, duration, status')
       .eq('planned_date', date)
       .eq('cleaner_id', (await supabase.auth.getUser()).data.user?.id)
       .not('status', 'eq', 'cancelled')
 
-    const occupiedTimes = occupied?.map(o => o.planned_time?.slice(0, 5)) || []
-
     const allSlots: string[] = []
+    
     for (let h = 8; h <= 19; h++) {
       for (let m = 0; m < 60; m += 30) {
         const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
-        if (!occupiedTimes.includes(time)) {
+        
+        let isAvailable = true
+        for (const order of existingOrders || []) {
+          const existingDuration = order.duration || 60
+          if (isTimeOverlap(time, duration, order.planned_time, existingDuration)) {
+            isAvailable = false
+            break
+          }
+        }
+        
+        if (isAvailable) {
           allSlots.push(time)
         }
       }
@@ -82,7 +113,32 @@ export default function NewOrderPage() {
 
     const { data: { user } } = await supabase.auth.getUser()
 
-    const { error } = await supabase.from('orders').insert({
+    const { data: conflictingOrders } = await supabase
+      .from('orders')
+      .select('planned_time, duration')
+      .eq('planned_date', form.planned_date)
+      .eq('cleaner_id', user?.id)
+      .not('status', 'eq', 'cancelled')
+
+    const duration = parseInt(form.duration)
+    let hasConflict = false
+
+    for (const order of conflictingOrders || []) {
+      const existingDuration = order.duration || 60
+      if (isTimeOverlap(form.planned_time, duration, order.planned_time, existingDuration)) {
+        hasConflict = true
+        break
+      }
+    }
+
+    if (hasConflict) {
+      alert(ordersT('timeConflict'))
+      setSubmitting(false)
+      loadAvailableTimes(form.planned_date, duration)
+      return
+    }
+
+    const { data, error } = await supabase.from('orders').insert({
       client_name: form.client_name,
       client_phone: form.client_phone,
       address: form.address,
@@ -91,15 +147,45 @@ export default function NewOrderPage() {
       price: parseFloat(form.price),
       planned_date: form.planned_date,
       planned_time: form.planned_time,
+      duration: duration,
       cleaner_id: user?.id,
       status: 'new',
       salary_type: 'manual',
       salary_value: null,
-    })
+    }).select()
 
     if (error) {
       alert(`${errorsT('serverError')}: ${error.message}`)
     } else {
+      const orderId = data?.[0]?.id
+      
+      if (orderId) {
+        const { data: admins } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('role', 'admin')
+        
+        if (admins && admins.length > 0) {
+          for (const admin of admins) {
+            try {
+              await fetch('/api/push/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: admin.id,
+                  title: notificationsT('newOrder'),
+                  body: `${form.client_name} - ${form.price} zł`,
+                  url: `/dashboard/admin/orders/${orderId}`,
+                  orderId: orderId
+                })
+              })
+            } catch (err) {
+              console.error('Failed to send push notification:', err)
+            }
+          }
+        }
+      }
+      
       router.push('/dashboard/cleaner')
       router.refresh()
     }
@@ -111,9 +197,18 @@ export default function NewOrderPage() {
     setForm(prev => ({ ...prev, [name]: value }))
   }, [])
 
+  const durationOptions = [
+    { value: '30', label: ordersT('durationOptions.30') },
+    { value: '60', label: ordersT('durationOptions.60') },
+    { value: '90', label: ordersT('durationOptions.90') },
+    { value: '120', label: ordersT('durationOptions.120') },
+    { value: '180', label: ordersT('durationOptions.180') },
+    { value: '240', label: ordersT('durationOptions.240') },
+  ]
+
   return (
     <div className="max-w-3xl mx-auto pb-20">
-      {/* Header with back button */}
+      {/* Header */}
       <div className="mb-6">
         <Link 
           href="/dashboard/cleaner"
@@ -215,6 +310,7 @@ export default function NewOrderPage() {
         </div>
         <div className="p-5 space-y-4">
           <div className="grid grid-cols-1 gap-4">
+            {/* Дата */}
             <div className="relative">
               <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
                 <Calendar size={18} />
@@ -228,31 +324,53 @@ export default function NewOrderPage() {
               />
             </div>
 
+            {/* Длительность уборки */}
+            <div className="relative">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                <Timer size={18} />
+              </div>
+              <select
+                required
+                value={form.duration}
+                onChange={(e) => setForm({ ...form, duration: e.target.value })}
+                className="w-full pl-11 pr-4 py-3 text-base bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-all duration-200"
+              >
+                {durationOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Время начала */}
             <div className="relative">
               <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
                 <Clock size={18} />
               </div>
-              <select
-                required
-                value={form.planned_time}
-                onChange={(e) => setForm({ ...form, planned_time: e.target.value })}
-                disabled={loading || !form.planned_date}
-                className="w-full pl-11 pr-4 py-3 text-base bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value="">{ordersT('selectTime')}</option>
-                {availableTimes.map(time => (
-                  <option key={time} value={time}>{time}</option>
-                ))}
-              </select>
+              {!loading && availableTimes.length > 0 && (
+                <TimeSlotGrid
+                  availableTimes={availableTimes}
+                  selectedTime={form.planned_time}
+                  onSelectTime={(time) => setForm({ ...form, planned_time: time })}
+                  loading={loading}
+                />
+              )}
+              {availableTimes.length === 0 && !loading && form.planned_date && (
+                <div className="mt-2 p-4 text-center bg-gray-50 dark:bg-gray-800 rounded-xl">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {t('noAvailableSlots')}
+                  </p>
+                </div>
+              )}
               {loading && (
                 <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
                   <Loader2 size={12} className="animate-spin" />
-                  {t('loading')}
+                  {t('loadingSlots')}
                 </p>
               )}
             </div>
           </div>
 
+          {/* Цена */}
           <div className="relative">
             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
               <DollarSign size={18} />
@@ -269,6 +387,7 @@ export default function NewOrderPage() {
             />
           </div>
 
+          {/* Комментарий */}
           <div className="relative">
             <div className="absolute left-4 top-4 text-gray-400">
               <MessageSquare size={18} />

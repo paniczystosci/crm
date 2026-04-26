@@ -1,0 +1,82 @@
+<!-- public/offline.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Нет соединения</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .container {
+      background: white;
+      border-radius: 32px;
+      padding: 40px 32px;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+    
+    .icon {
+      font-size: 80px;
+      margin-bottom: 20px;
+    }
+    
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 12px;
+    }
+    
+    p {
+      color: #6b7280;
+      line-height: 1.5;
+      margin-bottom: 32px;
+    }
+    
+    button {
+      background: #10b981;
+      color: white;
+      border: none;
+      padding: 14px 28px;
+      border-radius: 20px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    button:hover {
+      background: #059669;
+      transform: translateY(-2px);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">📡</div>
+    <h1>Нет соединения</h1>
+    <p>Пожалуйста, проверьте подключение к интернету и попробуйте снова</p>
+    <button onclick="location.reload()">Обновить страницу</button>
+  </div>
+</body>
+</html>

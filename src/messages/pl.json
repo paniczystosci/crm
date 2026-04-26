@@ -1,5 +1,6 @@
 {
   "common": {
+    "bankTransferInfo": "zostanie zaksięgowana na koncie firmy",
     "login": "Zaloguj się",
     "logout": "Wyloguj się",
     "save": "Zapisz",
@@ -40,7 +41,11 @@
     "acceptPayment": "Przyjąć płatność",
     "and": "i",
     "googleMaps": "Link Google Maps (opcjonalnie)",
-    "optional": "opcjonalnie"
+    "optional": "opcjonalnie",
+    "noAvailableSlots": "Brak dostępnych slotów w wybranym dniu",
+    "loadingSlots": "Ładowanie dostępnych slotów...",
+    "hours": "godz",
+    "minutes": "min"
   },
   "nav": {
     "dashboard": "Panel główny",
@@ -50,7 +55,8 @@
     "stats": "Statystyki",
     "myOrders": "Moje zamówienia",
     "newOrder": "Nowe zamówienie",
-    "cash": "Kasa"
+    "cash": "Kasa",
+    "calendar": "Kalendarz"
   },
   "auth": {
     "subtitle": "Zaloguj się do swojego konta",
@@ -103,7 +109,18 @@
     "complete": "Zakończyć sprzątanie",
     "completeAndPay": "Zakończyć sprzątanie i przyjąć płatność",
     "loadError": "Błąd podczas ładowania zamówień",
-    "timeAt": "o"
+    "timeAt": "o",
+    "duration": "Czas sprzątania",
+    "timeConflict": "Wybrany czas koliduje z innym zamówieniem. Proszę wybrać inny termin.",
+    "durationOptions": {
+      "30": "30 minut",
+      "60": "1 godzina",
+      "90": "1.5 godziny",
+      "120": "2 godziny",
+      "180": "3 godziny",
+      "240": "4 godziny"
+    }
+    
   },
   "cleaners": {
     "title": "Zespół",
@@ -234,5 +251,59 @@
     "orderNotFound": "Nie znaleziono zamówienia",
     "accessDenied": "Nie masz dostępu do tego zamówienia",
     "loadError": "Błąd podczas ładowania danych"
+  },
+    "calendar": {
+    "title": "Kalendarz zamówień",
+    "description": "Planowanie wizualne i zarządzanie zamówieniami",
+    "filterByCleaner": "Sprzątacz",
+    "allCleaners": "Wszyscy sprzątacze",
+    "timeConflict": "Ten czas jest już zajęty przez inne zamówienie!",
+    "updateError": "Błąd przy aktualizacji daty",
+    "duration": "Czas trwania",
+    "dragHint": "Przeciągnij zamówienia myszką, aby zmienić datę i godzinę"
+  },
+  "notifications": {
+    "newOrder": "🆕 Nowe zamówienie",
+    "title": "Powiadomienia",
+    "pushNotifications": "Powiadomienia push",
+    "pushDescription": "Otrzymuj powiadomienia o nowych zamówieniach, nawet gdy strona jest zamknięta",
+    "on": "Powiadomienia wł",
+    "off": "Powiadomienia wył",
+    "enable": "Włącz powiadomienia",
+    "disable": "Wyłącz powiadomienia",
+    "blocked": "Powiadomienia zablokowane",
+    "blockedHelp": "Aby włączyć powiadomienia, kliknij ikonę kłódki 🔒 obok adresu URL i zezwól na powiadomienia.",
+    "browserNotSupported": "Twoja przeglądarka nie obsługuje powiadomień push",
+    "permissionRequired": "Wymagane zezwolenie na powiadomienia",
+    "notConfigured": "Powiadomienia push nie są skonfigurowane. Skontaktuj się z administratorem.",
+    "enabled": "Powiadomienia włączone!",
+    "disabled": "Powiadomienia wyłączone!",
+    "enableError": "Błąd podczas włączania powiadomień",
+    "disableError": "Błąd podczas wyłączania powiadomień",
+    "statusChanged": "Status zamówienia zmieniony",
+    "orderAssigned": "Przypisano Ci zamówienie",
+    "paymentReceived": "Otrzymano płatność"
+  },
+  "pwa": {
+    "title": "Zainstaluj aplikację",
+    "description": "Zainstaluj CRM Cleaning Company na swoim telefonie lub komputerze",
+    "benefits": "Szybki dostęp, praca offline, powiadomienia push",
+    "install": "Zainstaluj",
+    "dismiss": "Nie teraz",
+    "installTitle": "Zainstalować aplikację?",
+    "installDescription": "Zainstaluj aplikację dla szybkiego dostępu i wygodnej pracy",
+    "installApp": "Zainstaluj aplikację",
+    "iosStep1": "Naciśnij przycisk «Udostępnij»",
+    "iosStep1Desc": "W dolnej części przeglądarki naciśnij ikonę «Udostępnij»",
+    "iosStep2": "Wybierz «Na ekran główny»",
+    "iosStep2Desc": "Przewiń w dół i naciśnij «Na ekran główny»",
+    "iosStep3": "Naciśnij «Dodaj»",
+    "iosStep3Desc": "Potwierdź instalację aplikacji",
+    "androidStep1": "Naciśnij menu przeglądarki",
+    "androidStep1Desc": "W prawym górnym rogu naciśnij trzy kropki",
+    "androidStep2": "Wybierz «Zainstaluj aplikację»",
+    "androidStep2Desc": "Naciśnij «Zainstaluj» i potwierdź",
+    "desktopSupport": "Kliknij ikonę instalacji na pasku adresu",
+    "desktopHint": "Obsługiwane w Chrome, Edge, Firefox"
   }
 }

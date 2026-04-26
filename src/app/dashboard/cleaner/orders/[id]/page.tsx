@@ -50,6 +50,7 @@ export default function CleanerOrderDetail() {
   const paymentsT = useTranslations('payments')
   const chatT = useTranslations('chat')
   const errorsT = useTranslations('errors')
+  const notificationsT = useTranslations('notifications')
   
   const { id } = useParams() as { id: string }
   const router = useRouter()

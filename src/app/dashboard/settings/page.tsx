@@ -4,16 +4,19 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { Lock, Eye, EyeOff, CheckCircle, AlertCircle, ArrowLeft, Globe, Monitor } from 'lucide-react'
+import { Lock, Eye, EyeOff, CheckCircle, AlertCircle, ArrowLeft, Globe, Monitor, Bell } from 'lucide-react'
 import Link from 'next/link'
 import { useLocale, useTranslations } from 'next-intl'
 import { locales, localeNames, localeFlags, defaultLocale } from '@/i18n/config'
 import { setCookie } from 'cookies-next'
+import { PushNotification } from '@/components/PushNotification'
+import { PWAInstall } from '@/components/PWAInstall'
 
 export default function SettingsPage() {
   const t = useTranslations('settings')
   const commonT = useTranslations('common')
   const errorsT = useTranslations('errors')
+  const notificationsT = useTranslations('notifications')
   
   const currentLocale = useLocale()
   const [systemLocale, setSystemLocale] = useState<string>('')
@@ -28,9 +31,18 @@ export default function SettingsPage() {
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [languageSuccess, setLanguageSuccess] = useState(false)
+  const [user, setUser] = useState<any>(null)
 
   const router = useRouter()
   const supabase = createClient()
+
+    useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+    }
+    getUser()
+  }, [])
 
   // Определяем системный язык
   useEffect(() => {
@@ -135,6 +147,8 @@ export default function SettingsPage() {
         </div>
       </div>
 
+<PWAInstall />
+
       {/* Language Switcher */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden mb-6">
         <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
@@ -187,6 +201,26 @@ export default function SettingsPage() {
         </div>
       </div>
 
+<div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden mb-6">
+  <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
+    <h2 className="font-semibold text-lg flex items-center gap-2">
+      <Bell size={20} className="text-emerald-500" />
+      {notificationsT('title')}
+    </h2>
+  </div>
+  <div className="p-6">
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="font-medium text-gray-900 dark:text-white">{notificationsT('pushNotifications')}</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          {notificationsT('pushDescription')}
+        </p>
+      </div>
+      <PushNotification />
+    </div>
+  </div>
+</div>
+
       {/* Password Change Form */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
@@ -197,6 +231,23 @@ export default function SettingsPage() {
         </div>
 
         <form onSubmit={handleChangePassword} className="p-6 space-y-6">
+  <input 
+    type="hidden" 
+    name="username" 
+    autoComplete="username" 
+    value={user?.email || ''} 
+  />
+  
+  {/* Визуально скрытое поле для браузера (решение проблемы) */}
+  <div className="sr-only" aria-hidden="true">
+    <input 
+      type="text" 
+      name="username" 
+      autoComplete="username" 
+      defaultValue={user?.email || ''} 
+      readOnly
+    />
+  </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               {t('currentPassword')}
@@ -207,6 +258,8 @@ export default function SettingsPage() {
               </div>
               <input
                 type={showCurrentPassword ? 'text' : 'password'}
+                name="current-password" // 👈 Добавьте name
+                autoComplete="current-password" // 👈 Добавьте autocomplete
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 required
@@ -233,6 +286,8 @@ export default function SettingsPage() {
               </div>
               <input
                 type={showNewPassword ? 'text' : 'password'}
+                name="new-password" // 👈 Добавьте name
+                autoComplete="new-password" // 👈 Добавьте autocomplete
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
@@ -260,6 +315,8 @@ export default function SettingsPage() {
               </div>
               <input
                 type={showConfirmPassword ? 'text' : 'password'}
+                name="confirm-password" // 👈 Добавьте name
+                autoComplete="new-password" // 👈 Добавьте autocomplete
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required

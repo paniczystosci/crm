@@ -1,5 +1,6 @@
 {
   "common": {
+    "bankTransferInfo": "wird auf das Firmenkonto überwiesen",
     "login": "Anmelden",
     "logout": "Abmelden",
     "save": "Speichern",
@@ -40,7 +41,11 @@
     "acceptPayment": "Zahlung akzeptieren",
     "and": "und",
     "googleMaps": "Google Maps Link (optional)",
-    "optional": "optional"
+    "optional": "optional",
+    "noAvailableSlots": "Keine verfügbaren Slots für das ausgewählte Datum",
+    "loadingSlots": "Verfügbare Slots werden geladen...",
+    "hours": "Std",
+    "minutes": "Min"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -50,7 +55,8 @@
     "stats": "Statistiken",
     "myOrders": "Meine Aufträge",
     "newOrder": "Neuer Auftrag",
-    "cash": "Kasse"
+    "cash": "Kasse",
+    "calendar": "Kalender"
   },
   "auth": {
     "subtitle": "Melden Sie sich bei Ihrem Konto an",
@@ -103,7 +109,17 @@
     "complete": "Reinigung abschließen",
     "completeAndPay": "Reinigung abschließen und Zahlung annehmen",
     "loadError": "Fehler beim Laden der Aufträge",
-    "timeAt": "um"
+    "timeAt": "um",
+    "duration": "Reinigungsdauer",
+    "timeConflict": "Die ausgewählte Zeit überschneidet sich mit einem anderen Auftrag. Bitte wählen Sie eine andere Zeit.",
+    "durationOptions": {
+      "30": "30 Minuten",
+      "60": "1 Stunde",
+      "90": "1.5 Stunden",
+      "120": "2 Stunden",
+      "180": "3 Stunden",
+      "240": "4 Stunden"
+    }
   },
   "cleaners": {
     "title": "Team",
@@ -234,5 +250,59 @@
     "orderNotFound": "Auftrag nicht gefunden",
     "accessDenied": "Sie haben keinen Zugriff auf diesen Auftrag",
     "loadError": "Fehler beim Laden der Daten"
+  },
+    "calendar": {
+    "title": "Auftragskalender",
+    "description": "Visuelle Planung und Auftragsverwaltung",
+    "filterByCleaner": "Reinigungskraft",
+    "allCleaners": "Alle Reinigungskräfte",
+    "timeConflict": "Diese Zeit ist bereits durch einen anderen Auftrag belegt!",
+    "updateError": "Fehler beim Aktualisieren des Datums",
+    "duration": "Dauer",
+    "dragHint": "Ziehen Sie Aufträge mit der Maus, um Datum und Uhrzeit zu ändern"
+  },
+"notifications": {
+  "newOrder": "🆕 Neuer Auftrag",
+    "title": "Benachrichtigungen",
+    "pushNotifications": "Push-Benachrichtigungen",
+    "pushDescription": "Erhalten Sie Benachrichtigungen über neue Aufträge, auch wenn die Seite geschlossen ist",
+    "on": "Benachrichtigungen ein",
+    "off": "Benachrichtigungen aus",
+    "enable": "Benachrichtigungen aktivieren",
+    "disable": "Benachrichtigungen deaktivieren",
+    "blocked": "Benachrichtigungen blockiert",
+    "blockedHelp": "Um Benachrichtigungen zu aktivieren, klicken Sie auf das Schloss-Symbol 🔒 neben der URL und erlauben Sie Benachrichtigungen.",
+    "browserNotSupported": "Ihr Browser unterstützt keine Push-Benachrichtigungen",
+    "permissionRequired": "Benachrichtigungsberechtigung erforderlich",
+    "notConfigured": "Push-Benachrichtigungen nicht konfiguriert. Bitte kontaktieren Sie den Administrator.",
+    "enabled": "Benachrichtigungen aktiviert!",
+    "disabled": "Benachrichtigungen deaktiviert!",
+    "enableError": "Fehler beim Aktivieren von Benachrichtigungen",
+    "disableError": "Fehler beim Deaktivieren von Benachrichtigungen",
+    "statusChanged": "Auftragsstatus geändert",
+    "orderAssigned": "Auftrag Ihnen zugewiesen",
+    "paymentReceived": "Zahlung erhalten"
+  },
+  "pwa": {
+    "title": "App installieren",
+    "description": "Installieren Sie CRM Cleaning Company auf Ihrem Telefon oder Computer",
+    "benefits": "Schneller Zugriff, Offline-Arbeit, Push-Benachrichtigungen",
+    "install": "Installieren",
+    "dismiss": "Nicht jetzt",
+    "installTitle": "App installieren?",
+    "installDescription": "Installieren Sie die App für schnellen Zugriff und bequemes Arbeiten",
+    "installApp": "App installieren",
+    "iosStep1": "Tippen Sie auf die Schaltfläche «Teilen»",
+    "iosStep1Desc": "Tippen Sie in der unteren Leiste des Browsers auf das Teilen-Symbol",
+    "iosStep2": "Wählen Sie «Zum Home-Bildschirm»",
+    "iosStep2Desc": "Scrollen Sie nach unten und tippen Sie auf «Zum Home-Bildschirm»",
+    "iosStep3": "Tippen Sie auf «Hinzufügen»",
+    "iosStep3Desc": "Bestätigen Sie die App-Installation",
+    "androidStep1": "Tippen Sie auf das Browsermenü",
+    "androidStep1Desc": "Tippen Sie in der oberen rechten Ecke auf drei Punkte",
+    "androidStep2": "Wählen Sie «App installieren»",
+    "androidStep2Desc": "Tippen Sie auf «Installieren» und bestätigen Sie",
+    "desktopSupport": "Klicken Sie auf das Installationssymbol in der Adressleiste",
+    "desktopHint": "Unterstützt auf Chrome, Edge, Firefox"
   }
 }

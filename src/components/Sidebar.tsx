@@ -15,6 +15,7 @@ import {
   LogOut, 
   X,
   Settings,
+  Calendar,
   Plus
 } from 'lucide-react'
 import { useUnreadMessages } from '@/hooks/useUnreadMessages'
@@ -73,13 +74,14 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     )
   }
 
-  const adminNavItems = [
-    { href: '/dashboard/admin', label: navT('dashboard'), icon: LayoutDashboard, showNotification: false },
-    { href: '/dashboard/admin/orders', label: navT('orders'), icon: ClipboardList, showNotification: true },
-    { href: '/dashboard/admin/cleaners', label: cleanersT('title'), icon: Users, showNotification: false },
-    { href: '/dashboard/admin/payments', label: navT('payments'), icon: DollarSign, showNotification: false },
-    { href: '/dashboard/admin/stats', label: navT('stats'), icon: BarChart3, showNotification: false },
-  ]
+const adminNavItems = [
+  { href: '/dashboard/admin', label: navT('dashboard'), icon: LayoutDashboard, showNotification: false },
+  { href: '/dashboard/admin/orders', label: navT('orders'), icon: ClipboardList, showNotification: true },
+  { href: '/dashboard/admin/cleaners', label: cleanersT('title'), icon: Users, showNotification: false },
+  { href: '/dashboard/admin/payments', label: navT('payments'), icon: DollarSign, showNotification: false },
+  { href: '/dashboard/admin/stats', label: navT('stats'), icon: BarChart3, showNotification: false },
+  { href: '/dashboard/admin/calendar', label: navT('calendar'), icon: Calendar, showNotification: false },
+]
 
   const cleanerNavItems = [
     { href: '/dashboard/cleaner', label: navT('myOrders'), icon: ClipboardList, showNotification: true },
