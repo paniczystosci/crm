@@ -1,66 +1,68 @@
-
 {
   "name": "CRM Cleaning Company",
   "short_name": "CRM",
   "description": "Управление клининговой компанией",
-  "start_url": "/",
+  "start_url": "/dashboard",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "theme_color": "#10b981",
   "background_color": "#ffffff",
   "orientation": "portrait",
   "scope": "/",
   "categories": ["business", "productivity"],
+  "prefer_related_applications": false,
+  "related_applications": [],
   "icons": [
     {
-      "src": "/icons/icon-72x72.png",
+      "src": "/logo.png",
       "sizes": "72x72",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-96x96.png",
+      "src": "/logo.png",
       "sizes": "96x96",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-128x128.png",
+      "src": "/logo.png",
       "sizes": "128x128",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-144x144.png",
+      "src": "/logo.png",
       "sizes": "144x144",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-152x152.png",
+      "src": "/logo.png",
       "sizes": "152x152",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-192x192.png",
+      "src": "/logo.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-256x256.png",
+      "src": "/logo.png",
       "sizes": "256x256",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-384x384.png",
+      "src": "/logo.png",
       "sizes": "384x384",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-512x512.png",
+      "src": "/logo.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -74,7 +76,7 @@
       "url": "/dashboard/cleaner/new",
       "icons": [
         {
-          "src": "/icons/icon-96x96.png",
+          "src": "/logo.png",
           "sizes": "96x96"
         }
       ]
@@ -86,11 +88,10 @@
       "url": "/dashboard/cleaner/orders",
       "icons": [
         {
-          "src": "/icons/icon-96x96.png",
+          "src": "/logo.png",
           "sizes": "96x96"
         }
       ]
     }
-  ],
-  "prefer_related_applications": false
+  ]
 }
