@@ -1,7 +1,6 @@
-// src/app/dashboard/cleaner/orders/[id]/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useParams, useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -17,12 +16,14 @@ import {
   User,
   CheckCircle,
   Clock as ClockIcon,
-  Sparkles,
   AlertCircle,
   Wallet,
   Landmark,
   Coins,
-  X
+  X,
+  Play,
+  Pause,
+  Square
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -41,16 +42,18 @@ type Order = {
   bank_received?: number | null
   change_given?: number | null
   is_incassed?: boolean
+  cleaner_id?: string | null
+  start_time?: string | null
+  end_time?: string | null
+  total_minutes?: number | null
+  duration?: string | null
 }
 
 export default function CleanerOrderDetail() {
   const t = useTranslations('common')
   const ordersT = useTranslations('orders')
-  const cashT = useTranslations('cash')
   const paymentsT = useTranslations('payments')
-  const chatT = useTranslations('chat')
   const errorsT = useTranslations('errors')
-  const notificationsT = useTranslations('notifications')
   
   const { id } = useParams() as { id: string }
   const router = useRouter()
@@ -63,6 +66,15 @@ export default function CleanerOrderDetail() {
   const [showPaymentForm, setShowPaymentForm] = useState(false)
   const [paymentType, setPaymentType] = useState<'cash' | 'bank'>('cash')
   const [clientGiven, setClientGiven] = useState(0)
+
+  // Трекер времени (обратный отсчёт)
+  const [trackerRunning, setTrackerRunning] = useState(false)
+  const [remainingSeconds, setRemainingSeconds] = useState(0)
+  const [initialDurationSeconds, setInitialDurationSeconds] = useState(0)
+  const [isInitialized, setIsInitialized] = useState(false)
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const timerStartTimeRef = useRef<Date | null>(null)
+  const remainingAtPauseRef = useRef(0)
 
   const supabase = createClient()
 
@@ -90,6 +102,49 @@ export default function CleanerOrderDetail() {
     cancelled: '❌',
   }
 
+  // Эффект для трекера времени
+  useEffect(() => {
+    if (trackerRunning && timerStartTimeRef.current) {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
+      timerIntervalRef.current = setInterval(() => {
+        const now = new Date()
+        const elapsedSinceStart = Math.floor((now.getTime() - timerStartTimeRef.current!.getTime()) / 1000)
+        const remaining = Math.max(0, remainingAtPauseRef.current - elapsedSinceStart)
+        setRemainingSeconds(remaining)
+        
+        if (remaining <= 0) {
+          if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
+          setTrackerRunning(false)
+          handleStopTimerAutomatically()
+        }
+      }, 1000)
+    } else {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
+    }
+    
+    return () => {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
+    }
+  }, [trackerRunning])
+
+  // Автоматическое завершение
+  const handleStopTimerAutomatically = async () => {
+    if (!order) return
+    
+    const nowISO = new Date().toISOString()
+    await supabase
+      .from('orders')
+      .update({ 
+        end_time: nowISO, 
+        total_minutes: Math.floor(initialDurationSeconds / 60),
+        status: 'done'
+      })
+      .eq('id', id)
+    
+    fetchOrder()
+    setShowPaymentForm(true)
+  }
+
   useEffect(() => {
     fetchOrder()
   }, [id])
@@ -109,14 +164,42 @@ export default function CleanerOrderDetail() {
         .from('orders')
         .select('*')
         .eq('id', id)
-        .eq('cleaner_id', user.id)
         .single()
 
       if (error || !data) {
         setError(errorsT('orderNotFound'))
       } else {
-        setOrder(data)
-        setClientGiven(data.price)
+        if (data.status === 'new' || data.cleaner_id === user.id) {
+          setOrder(data)
+          setClientGiven(data.price)
+          
+          // Рассчитываем длительность
+          const durationMinutes = parseInt(data.duration || '60')
+          const durationSeconds = durationMinutes * 60
+          setInitialDurationSeconds(durationSeconds)
+          
+          if (data.status === 'in_progress' && data.start_time) {
+            const start = new Date(data.start_time)
+            const now = new Date()
+            const elapsed = Math.floor((now.getTime() - start.getTime()) / 1000)
+            const remaining = Math.max(0, durationSeconds - elapsed)
+            
+            setRemainingSeconds(remaining)
+            remainingAtPauseRef.current = remaining
+            timerStartTimeRef.current = now
+            setTrackerRunning(true)
+          } else if (data.status === 'done') {
+            setRemainingSeconds(0)
+            setTrackerRunning(false)
+          } else {
+            setRemainingSeconds(durationSeconds)
+            remainingAtPauseRef.current = durationSeconds
+            setTrackerRunning(false)
+          }
+          setIsInitialized(true)
+        } else {
+          setError(errorsT('accessDenied'))
+        }
       }
     } catch (err) {
       setError(errorsT('loadError'))
@@ -128,12 +211,88 @@ export default function CleanerOrderDetail() {
   const updateStatus = async (newStatus: string) => {
     if (!order) return
     setUpdating(true)
+    
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    const updates: any = { status: newStatus }
+    
+    if (newStatus === 'accepted' && !order.cleaner_id) {
+      updates.cleaner_id = user?.id
+    }
+    
     const { error } = await supabase
       .from('orders')
-      .update({ status: newStatus })
+      .update(updates)
       .eq('id', id)
+      
     if (!error) fetchOrder()
     setUpdating(false)
+  }
+
+  const handleStartTimer = async () => {
+    if (!order) return
+    
+    const now = new Date()
+    const nowISO = now.toISOString()
+    
+    const { error } = await supabase
+      .from('orders')
+      .update({ 
+        start_time: nowISO, 
+        status: 'in_progress' 
+      })
+      .eq('id', id)
+    
+    if (!error) {
+      timerStartTimeRef.current = now
+      remainingAtPauseRef.current = initialDurationSeconds
+      setRemainingSeconds(initialDurationSeconds)
+      setTrackerRunning(true)
+      setOrder(prev => prev ? {...prev, status: 'in_progress', start_time: nowISO} : null)
+    }
+  }
+
+  const handlePauseTimer = async () => {
+    if (!trackerRunning) return
+    
+    const currentRemaining = remainingSeconds
+    remainingAtPauseRef.current = currentRemaining
+    setTrackerRunning(false)
+    
+    const elapsedSeconds = initialDurationSeconds - currentRemaining
+    await supabase
+      .from('orders')
+      .update({ total_minutes: Math.floor(elapsedSeconds / 60) })
+      .eq('id', id)
+  }
+
+  const handleResumeTimer = () => {
+    if (trackerRunning) return
+    timerStartTimeRef.current = new Date()
+    setTrackerRunning(true)
+  }
+
+  const handleStopTimer = async () => {
+    if (!order) return
+    setTrackerRunning(false)
+    
+    const elapsedSeconds = initialDurationSeconds - remainingSeconds
+    const totalMinutes = Math.max(1, Math.floor(elapsedSeconds / 60))
+    const nowISO = new Date().toISOString()
+    
+    const { error } = await supabase
+      .from('orders')
+      .update({ 
+        end_time: nowISO, 
+        total_minutes: totalMinutes,
+        status: 'done'
+      })
+      .eq('id', id)
+    
+    if (!error) {
+      setOrder(prev => prev ? {...prev, status: 'done', end_time: nowISO, total_minutes: totalMinutes} : null)
+      setShowPaymentForm(true)
+    }
   }
 
   const handleAcceptPayment = async () => {
@@ -167,17 +326,40 @@ export default function CleanerOrderDetail() {
   const getNextAction = () => {
     switch (order?.status) {
       case 'new':
-        return { label: ordersT('accept'), status: 'accepted', color: 'emerald', icon: CheckCircle }
+        return { 
+          label: ordersT('accept'), 
+          status: 'accepted', 
+          bgGradient: 'from-blue-600 to-blue-500',
+          hoverGradient: 'from-blue-700 to-blue-600',
+          icon: CheckCircle 
+        }
       case 'accepted':
-        return { label: ordersT('start'), status: 'in_progress', color: 'amber', icon: ClockIcon }
-      case 'in_progress':
-        return { label: ordersT('completeAndPay'), status: 'done', color: 'green', icon: Sparkles, action: () => setShowPaymentForm(true) }
+        return { 
+          label: ordersT('start'), 
+          status: 'in_progress', 
+          bgGradient: 'from-yellow-500 to-amber-500',
+          hoverGradient: 'from-yellow-600 to-amber-600',
+          icon: ClockIcon 
+        }
       default:
         return null
     }
   }
 
   const nextAction = getNextAction()
+
+  const formatTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    const secs = seconds % 60
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const getProgressPercent = () => {
+    if (initialDurationSeconds === 0) return 0
+    const elapsed = initialDurationSeconds - remainingSeconds
+    return (elapsed / initialDurationSeconds) * 100
+  }
 
   if (loading) {
     return (
@@ -210,10 +392,12 @@ export default function CleanerOrderDetail() {
   }
 
   const change = Math.max(0, clientGiven - order.price)
+  const isInProgress = order.status === 'in_progress'
+  const hasStarted = order.start_time !== null && order.end_time === null
+  const progressPercent = getProgressPercent()
 
   return (
     <div className="max-w-5xl mx-auto">
-      {/* Header with back button */}
       <div className="mb-8">
         <Link 
           href="/dashboard/cleaner"
@@ -245,9 +429,7 @@ export default function CleanerOrderDetail() {
         </div>
       </div>
 
-      {/* Main Info Grid */}
       <div className="grid md:grid-cols-2 gap-6 mb-8">
-        {/* Client Info */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div className="p-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
             <h2 className="font-semibold text-lg flex items-center gap-2">
@@ -284,7 +466,6 @@ export default function CleanerOrderDetail() {
           </div>
         </div>
 
-        {/* Order Details */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div className="p-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
             <h2 className="font-semibold text-lg flex items-center gap-2">
@@ -312,6 +493,22 @@ export default function CleanerOrderDetail() {
                 </span>
               </div>
             )}
+            {order.duration && (
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500">{ordersT('duration')}</span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {order.duration} {t('minutes')}
+                </span>
+              </div>
+            )}
+            {order.total_minutes && order.total_minutes > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500">{ordersT('cleaningTime')}</span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {Math.floor(order.total_minutes / 60)}ч {(order.total_minutes % 60)}мин
+                </span>
+              </div>
+            )}
             {order.comment && (
               <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-950/20 rounded-xl">
                 <p className="text-xs text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-2">{ordersT('comment')}</p>
@@ -322,13 +519,76 @@ export default function CleanerOrderDetail() {
         </div>
       </div>
 
-      {/* Status Action Button */}
+      {isInProgress && (
+        <div className="mb-8 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30 rounded-2xl p-6 border border-blue-200 dark:border-blue-800">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 rounded-full bg-blue-500/20 flex items-center justify-center">
+                <ClockIcon size={28} className="text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-gray-600 dark:text-gray-400">{t('timer')}</p>
+                <p className="text-3xl font-mono font-bold text-gray-900 dark:text-white">
+                  {formatTime(remainingSeconds)}
+                </p>
+              </div>
+            </div>
+            
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+              <div 
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            
+            <div className="flex justify-center gap-3">
+              {!hasStarted ? (
+                <button
+                  onClick={handleStartTimer}
+                  className="flex items-center gap-2 px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-all duration-200 shadow-md"
+                >
+                  <Play size={18} />
+                  {t('startCleaning')}
+                </button>
+              ) : (
+                <>
+                  {trackerRunning ? (
+                    <button
+                      onClick={handlePauseTimer}
+                      className="flex items-center gap-2 px-8 py-3 bg-yellow-600 hover:bg-yellow-700 text-white rounded-xl font-medium transition-all duration-200 shadow-md"
+                    >
+                      <Pause size={18} />
+                      {t('pause')}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleResumeTimer}
+                      className="flex items-center gap-2 px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium transition-all duration-200 shadow-md"
+                    >
+                      <Play size={18} />
+                      {t('resume')}
+                    </button>
+                  )}
+                  <button
+                    onClick={handleStopTimer}
+                    className="flex items-center gap-2 px-8 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium transition-all duration-200 shadow-md"
+                  >
+                    <Square size={18} />
+                    {t('complete')}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {nextAction && !showPaymentForm && (
         <div className="mb-8">
           <button
-            onClick={nextAction.action || (() => updateStatus(nextAction.status))}
+            onClick={() => updateStatus(nextAction.status)}
             disabled={updating}
-            className={`w-full py-4 bg-gradient-to-r from-${nextAction.color}-600 to-${nextAction.color}-500 hover:from-${nextAction.color}-700 hover:to-${nextAction.color}-600 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all duration-200 transform active:scale-[0.98] shadow-md flex items-center justify-center gap-2 text-lg`}
+            className={`w-full py-4 bg-gradient-to-r ${nextAction.bgGradient} hover:${nextAction.hoverGradient} disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all duration-200 transform active:scale-[0.98] shadow-md flex items-center justify-center gap-2 text-lg`}
           >
             {updating ? (
               <>
@@ -345,7 +605,6 @@ export default function CleanerOrderDetail() {
         </div>
       )}
 
-      {/* Payment Form Modal */}
       {showPaymentForm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
@@ -363,13 +622,16 @@ export default function CleanerOrderDetail() {
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Order Total */}
               <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-xl p-4 text-center">
                 <p className="text-sm text-gray-600 dark:text-gray-400">{ordersT('price')}</p>
                 <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{order.price} zł</p>
+                {order.total_minutes && order.total_minutes > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {ordersT('cleaningTime')}: {Math.floor(order.total_minutes / 60)}ч {(order.total_minutes % 60)}мин
+                  </p>
+                )}
               </div>
 
-              {/* Payment Type */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                   {t('paymentMethod')}
@@ -400,7 +662,6 @@ export default function CleanerOrderDetail() {
                 </div>
               </div>
 
-              {/* Cash Payment Fields */}
               {paymentType === 'cash' && (
                 <div className="space-y-4">
                   <div>
@@ -432,7 +693,6 @@ export default function CleanerOrderDetail() {
                 </div>
               )}
 
-              {/* Bank Payment Info */}
               {paymentType === 'bank' && (
                 <div className="bg-blue-50 dark:bg-blue-950/30 rounded-xl p-5 text-center">
                   <Landmark size={32} className="text-blue-500 mx-auto mb-2" />
@@ -445,7 +705,6 @@ export default function CleanerOrderDetail() {
                 </div>
               )}
 
-              {/* Action Buttons */}
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={handleAcceptPayment}
@@ -466,12 +725,10 @@ export default function CleanerOrderDetail() {
         </div>
       )}
 
-      {/* Chat Section */}
       <div className="mt-8">
         <OrderChat orderId={id} isAdmin={false} />
       </div>
 
-      {/* Footer Note */}
       <div className="mt-8 text-center text-xs text-gray-400 dark:text-gray-600">
         <p>© 2026 CRM Cleaning Company • {ordersT('title')} #{order.id.slice(0, 8).toUpperCase()}</p>
       </div>

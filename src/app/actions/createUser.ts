@@ -1,4 +1,3 @@
-// src/app/actions/createUser.ts
 'use server'
 
 import { createClient } from '@supabase/supabase-js'
@@ -22,7 +21,7 @@ export async function createNewUser(
   fullName: string,
   email: string,
   role: 'admin' | 'cleaner',
-  payoutRate: string = '25'   // ← НОВОЕ
+  payoutRate: string = '25'   // Может быть: '15', '25', '50', 'manual', 'hourly:30', 'hourly:40'
 ) {
   try {
     // 1. Создаём пользователя в Auth
@@ -44,7 +43,7 @@ export async function createNewUser(
         id: authData.user.id,
         full_name: fullName.trim(),
         role: role,
-        payout_rate: payoutRate,          // ← НОВОЕ
+        payout_rate: payoutRate,
       })
 
     if (profileError) {
@@ -55,9 +54,20 @@ export async function createNewUser(
       }
     }
 
+    // Форматируем сообщение для отображения ставки
+    let rateDisplay = ''
+    if (payoutRate === 'manual') {
+      rateDisplay = 'Ручная настройка'
+    } else if (payoutRate.startsWith('hourly:')) {
+      const hourlyRate = payoutRate.split(':')[1]
+      rateDisplay = `${hourlyRate} PLN/час`
+    } else {
+      rateDisplay = `${payoutRate}%`
+    }
+
     return { 
       success: true, 
-      message: `Пользователь ${fullName} успешно создан!\nEmail: ${email}\nВременный пароль: 123456\nСтавка: ${payoutRate === 'manual' ? 'Ручная' : payoutRate + '%'}` 
+      message: `✅ Пользователь ${fullName} успешно создан!\n\n📧 Email: ${email}\n🔑 Временный пароль: 123456\n💰 Ставка: ${rateDisplay}\n\n⚠️ Пользователь должен сменить пароль при первом входе.` 
     }
 
   } catch (err: any) {

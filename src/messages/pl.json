@@ -1,5 +1,11 @@
 {
   "common": {
+    "timer": "Tracker czasu",
+    "startCleaning": "Rozpocznij sprzątanie",
+    "pause": "Pauza",
+    "resume": "Wznów",
+    "complete": "Zakończ",
+    "bankTransfer": "Przelew bankowy",
     "bankTransferInfo": "zostanie zaksięgowana na koncie firmy",
     "login": "Zaloguj się",
     "logout": "Wyloguj się",
@@ -15,8 +21,8 @@
     "close": "Zamknij",
     "people": "osób",
     "noName": "Bez nazwy",
-    "success": "pomyślnie",
-    "create": "Tworzenie nowego rekordu",
+    "success": "Sukces",
+    "create": "Utwórz",
     "allRightsReserved": "Wszelkie prawa zastrzeżone",
     "adminPanel": "Panel Admina",
     "adminDescription": "Zarządzanie systemem",
@@ -29,7 +35,7 @@
     "cleanerPanel": "Panel sprzątacza",
     "version": "Wersja 2.0.0",
     "manageTasks": "Zarządzanie Twoimi zadaniami",
-    "total": "Ogólnie",
+    "total": "Razem",
     "tryAgain": "Spróbuj ponownie",
     "openInMaps": "Otwórz w Google Maps",
     "paymentMethod": "Metoda płatności",
@@ -45,7 +51,8 @@
     "noAvailableSlots": "Brak dostępnych slotów w wybranym dniu",
     "loadingSlots": "Ładowanie dostępnych slotów...",
     "hours": "godz",
-    "minutes": "min"
+    "minutes": "min",
+    "offlineWarning": "⚠️ Jesteś offline. Niektóre funkcje mogą być niedostępne."
   },
   "nav": {
     "dashboard": "Panel główny",
@@ -82,6 +89,7 @@
       "done": "Zakończone",
       "cancelled": "Anulowane"
     },
+    "cleaningTime": "Czas sprzątania",
     "client": "Klient",
     "address": "Adres",
     "price": "Cena",
@@ -120,7 +128,6 @@
       "180": "3 godziny",
       "240": "4 godziny"
     }
-    
   },
   "cleaners": {
     "title": "Zespół",
@@ -252,7 +259,7 @@
     "accessDenied": "Nie masz dostępu do tego zamówienia",
     "loadError": "Błąd podczas ładowania danych"
   },
-    "calendar": {
+  "calendar": {
     "title": "Kalendarz zamówień",
     "description": "Planowanie wizualne i zarządzanie zamówieniami",
     "filterByCleaner": "Sprzątacz",

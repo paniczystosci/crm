@@ -164,24 +164,24 @@ export default function CleanerCashPage() {
         </div>
       </div>
 
-      {/* Пульсирующее уведомление если есть деньги */}
-      {hasMoney && (
-        <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl animate-pulse">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
-              <Clock size={20} className="text-amber-600" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
-                {cashT('hasFunds')}
-              </p>
-              <p className="text-xs text-amber-600 dark:text-amber-400">
-                {cashT('handoverPrompt')}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+{/* Пульсирующее уведомление если есть деньги */}
+{hasMoney && (
+  <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl animate-pulse">
+    <div className="flex items-center gap-3">
+      <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
+        <Clock size={20} className="text-amber-600" />
+      </div>
+      <div>
+        <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+          {cashT('hasFunds')}
+        </p>
+        <p className="text-xs text-amber-600 dark:text-amber-400">
+          {cashT('handoverPrompt', { cash: summary.totalCash, bank: summary.totalBank })}
+        </p>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Orders List */}
       {pendingOrders.length > 0 ? (

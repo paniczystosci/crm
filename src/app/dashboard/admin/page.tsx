@@ -1,4 +1,3 @@
-// src/app/dashboard/admin/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -22,7 +21,7 @@ export default function AdminDashboard() {
   const ordersT = useTranslations('orders')
   const cleanersT = useTranslations('cleaners')
   const paymentsT = useTranslations('payments')
-  const navT = useTranslations('nav')  // 👈 ДОБАВЬТЕ ЭТУ СТРОКУ
+  const navT = useTranslations('nav')
   
   const [stats, setStats] = useState({
     totalOrders: 0,
@@ -98,6 +97,7 @@ export default function AdminDashboard() {
       totalRevenue,
     })
 
+    // 🔧 КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: только завершённые заказы (status = 'done')
     const { count: unpaidCount, data: unpaidData } = await supabase
       .from('orders')
       .select(`
@@ -107,7 +107,7 @@ export default function AdminDashboard() {
         planned_date,
         profiles!cleaner_id (full_name)
       `, { count: 'exact' })
-      .eq('status', 'done')
+      .eq('status', 'done')        // 👈 ТОЛЬКО ЗАВЕРШЁННЫЕ ЗАКАЗЫ
       .eq('is_paid_to_cleaner', false)
       .order('planned_date', { ascending: false })
       .limit(6)
@@ -142,11 +142,11 @@ export default function AdminDashboard() {
     { label: paymentsT('title'), value: `${stats.totalRevenue} zł`, icon: DollarSign, color: 'from-amber-500 to-amber-600', bgColor: 'bg-amber-50 dark:bg-amber-950/30' },
   ]
 
-const quickActions = [
-  { title: ordersT('title'), description: ordersT('manage'), emoji: '📋', href: '/dashboard/admin/orders', color: 'hover:border-blue-200 dark:hover:border-blue-800' },
-  { title: cleanersT('title'), description: cleanersT('manage'), emoji: '👥', href: '/dashboard/admin/cleaners', color: 'hover:border-purple-200 dark:hover:border-purple-800' },
-  { title: navT('calendar'), description: 'Визуальное планирование', emoji: '📅', href: '/dashboard/admin/calendar', color: 'hover:border-emerald-200 dark:hover:border-emerald-800' },
-]
+  const quickActions = [
+    { title: ordersT('title'), description: ordersT('manage'), emoji: '📋', href: '/dashboard/admin/orders', color: 'hover:border-blue-200 dark:hover:border-blue-800' },
+    { title: cleanersT('title'), description: cleanersT('manage'), emoji: '👥', href: '/dashboard/admin/cleaners', color: 'hover:border-purple-200 dark:hover:border-purple-800' },
+    { title: navT('calendar'), description: 'Визуальное планирование', emoji: '📅', href: '/dashboard/admin/calendar', color: 'hover:border-emerald-200 dark:hover:border-emerald-800' },
+  ]
 
   return (
     <div>
@@ -165,7 +165,7 @@ const quickActions = [
         </div>
       </div>
 
-      {/* Alert Banner */}
+      {/* Alert Banner - ТОЛЬКО ДЛЯ ЗАВЕРШЁННЫХ ЗАКАЗОВ */}
       {unpaidDoneCount > 0 && (
         <div className="mb-8 animate-in slide-in-from-top-4 duration-500">
           <NeoCard>

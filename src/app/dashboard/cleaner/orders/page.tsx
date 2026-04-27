@@ -1,4 +1,3 @@
-// src/app/dashboard/cleaner/orders/[id]/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -7,23 +6,27 @@ import { useParams, useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import OrderChat from '@/components/OrderChat'
 import { 
-  ArrowLeft, 
   Calendar, 
-  Clock, 
-  User, 
-  Phone, 
   MapPin, 
-  ExternalLink, 
+  Phone, 
   DollarSign, 
-  MessageSquare,
+  ExternalLink, 
+  ArrowLeft, 
+  Clock, 
+  User,
   CheckCircle,
   Clock as ClockIcon,
   Sparkles,
-  AlertCircle
+  AlertCircle,
+  Wallet,
+  Landmark,
+  Coins,
+  X
 } from 'lucide-react'
 import Link from 'next/link'
 
 type Order = {
+  cleaner_id: any
   id: string
   client_name: string
   client_phone: string
@@ -34,11 +37,16 @@ type Order = {
   status: 'new' | 'accepted' | 'in_progress' | 'done' | 'cancelled'
   planned_date?: string | null
   planned_time?: string | null
+  cash_received?: number | null
+  bank_received?: number | null
+  change_given?: number | null
+  is_incassed?: boolean
 }
 
 export default function CleanerOrderDetail() {
   const t = useTranslations('common')
   const ordersT = useTranslations('orders')
+  const paymentsT = useTranslations('payments')
   const chatT = useTranslations('chat')
   const errorsT = useTranslations('errors')
   
@@ -49,6 +57,10 @@ export default function CleanerOrderDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [updating, setUpdating] = useState(false)
+
+  const [showPaymentForm, setShowPaymentForm] = useState(false)
+  const [paymentType, setPaymentType] = useState<'cash' | 'bank'>('cash')
+  const [clientGiven, setClientGiven] = useState(0)
 
   const supabase = createClient()
 
@@ -69,11 +81,11 @@ export default function CleanerOrderDetail() {
   }
 
   const statusIcons: Record<string, string> = {
-    new: '',
-    accepted: '',
-    in_progress: '',
-    done: '',
-    cancelled: '',
+    new: '🆕',
+    accepted: '✅',
+    in_progress: '🔄',
+    done: '✔️',
+    cancelled: '❌',
   }
 
   useEffect(() => {
@@ -85,30 +97,39 @@ export default function CleanerOrderDetail() {
     setError(null)
 
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-      if (authError || !user) {
-        console.error('Пользователь не авторизован:', authError)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
         router.push('/auth/login')
         return
       }
 
+      // 🔧 ИЗМЕНЕНИЕ: убираем проверку на cleaner_id для новых заказов
+      // Чтобы клинер мог видеть заказ, даже если он ещё не назначен
+      let query = supabase
+        .from('orders')
+        .select('*')
+        .eq('id', id)
+
+      // Если заказ не новый, проверяем что он назначен этому клинеру
+      // Для новых заказов (status = 'new') пропускаем проверку cleaner_id
       const { data, error } = await supabase
         .from('orders')
         .select('*')
         .eq('id', id)
-        .eq('cleaner_id', user.id)
         .single()
 
       if (error || !data) {
-        console.error('Ошибка загрузки заказа:', error)
         setError(errorsT('orderNotFound'))
-        setOrder(null)
       } else {
-        setOrder(data)
+        // Проверяем доступ: если заказ не новый и не назначен этому клинеру - ошибка
+        if (data.status !== 'new' && data.cleaner_id !== user.id) {
+          setError(errorsT('accessDenied'))
+        } else {
+          setOrder(data)
+          setClientGiven(data.price)
+        }
       }
     } catch (err) {
-      console.error('Неожиданная ошибка при загрузке заказа:', err)
       setError(errorsT('loadError'))
     } finally {
       setLoading(false)
@@ -118,29 +139,82 @@ export default function CleanerOrderDetail() {
   const updateStatus = async (newStatus: string) => {
     if (!order) return
     setUpdating(true)
+    
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    // При принятии заказа - назначаем cleaner_id
+    const updates: any = { status: newStatus }
+    if (newStatus === 'accepted' && !order.cleaner_id) {
+      updates.cleaner_id = user?.id
+    }
+    
+    const { error } = await supabase
+      .from('orders')
+      .update(updates)
+      .eq('id', id)
+      
+    if (!error) fetchOrder()
+    setUpdating(false)
+  }
+
+  const handleAcceptPayment = async () => {
+    if (!order) return
+
+    const cash = paymentType === 'cash' ? clientGiven : 0
+    const bank = paymentType === 'bank' ? order.price : 0
+    const change = paymentType === 'cash' ? Math.max(0, clientGiven - order.price) : 0
 
     const { error } = await supabase
       .from('orders')
-      .update({ status: newStatus })
+      .update({
+        status: 'done',
+        cash_received: cash,
+        bank_received: bank,
+        change_given: change,
+        payment_accepted_at: new Date().toISOString(),
+        is_incassed: false,
+      })
       .eq('id', id)
 
     if (error) {
-      console.error('Ошибка обновления статуса:', error)
-      alert(errorsT('serverError'))
+      alert(`${errorsT('serverError')}: ${error.message}`)
     } else {
+      alert(paymentsT('paidMessage'))
+      setShowPaymentForm(false)
       fetchOrder()
     }
-    setUpdating(false)
   }
 
   const getNextAction = () => {
     switch (order?.status) {
       case 'new':
-        return { label: ordersT('accept'), status: 'accepted', color: 'emerald', icon: CheckCircle }
+        return { 
+          label: ordersT('accept'), 
+          status: 'accepted', 
+          color: 'blue',
+          bgGradient: 'from-blue-600 to-blue-500',
+          hoverGradient: 'from-blue-700 to-blue-600',
+          icon: CheckCircle 
+        }
       case 'accepted':
-        return { label: ordersT('start'), status: 'in_progress', color: 'amber', icon: ClockIcon }
+        return { 
+          label: ordersT('start'), 
+          status: 'in_progress', 
+          color: 'yellow',
+          bgGradient: 'from-yellow-500 to-amber-500',
+          hoverGradient: 'from-yellow-600 to-amber-600',
+          icon: ClockIcon 
+        }
       case 'in_progress':
-        return { label: ordersT('complete'), status: 'done', color: 'green', icon: Sparkles }
+        return { 
+          label: ordersT('completeAndPay'), 
+          status: 'done', 
+          color: 'green',
+          bgGradient: 'from-green-600 to-emerald-600',
+          hoverGradient: 'from-green-700 to-emerald-700',
+          icon: Sparkles, 
+          action: () => setShowPaymentForm(true) 
+        }
       default:
         return null
     }
@@ -177,6 +251,8 @@ export default function CleanerOrderDetail() {
       </div>
     )
   }
+
+  const change = Math.max(0, clientGiven - order.price)
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -267,7 +343,7 @@ export default function CleanerOrderDetail() {
             {order.planned_date && (
               <div className="flex justify-between items-center">
                 <span className="text-gray-500">{ordersT('plannedDate')}</span>
-                <span className="font-medium flex items-center gap-2">
+                <span className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
                   <Calendar size={16} className="text-gray-400" />
                   {new Date(order.planned_date).toLocaleDateString('ru-RU')}
                   {order.planned_time && (
@@ -290,12 +366,12 @@ export default function CleanerOrderDetail() {
       </div>
 
       {/* Status Action Button */}
-      {nextAction && (
+      {nextAction && !showPaymentForm && (
         <div className="mb-8">
           <button
-            onClick={() => updateStatus(nextAction.status)}
+            onClick={nextAction.action || (() => updateStatus(nextAction.status))}
             disabled={updating}
-            className={`w-full py-4 bg-gradient-to-r from-${nextAction.color}-600 to-${nextAction.color}-500 hover:from-${nextAction.color}-700 hover:to-${nextAction.color}-600 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all duration-200 transform active:scale-[0.98] shadow-md flex items-center justify-center gap-2 text-lg`}
+            className={`w-full py-4 bg-gradient-to-r ${nextAction.bgGradient} hover:${nextAction.hoverGradient} disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all duration-200 transform active:scale-[0.98] shadow-md flex items-center justify-center gap-2 text-lg`}
           >
             {updating ? (
               <>
@@ -312,17 +388,130 @@ export default function CleanerOrderDetail() {
         </div>
       )}
 
+      {/* Payment Form Modal */}
+      {showPaymentForm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-5 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Wallet size={22} className="text-emerald-500" />
+                {paymentsT('title')}
+              </h2>
+              <button
+                onClick={() => setShowPaymentForm(false)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Order Total */}
+              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-xl p-4 text-center">
+                <p className="text-sm text-gray-600 dark:text-gray-400">{ordersT('price')}</p>
+                <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{order.price} zł</p>
+              </div>
+
+              {/* Payment Type */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  {t('paymentMethod')}
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setPaymentType('cash')}
+                    className={`flex items-center justify-center gap-2 py-3 rounded-xl font-medium transition-all duration-200 ${
+                      paymentType === 'cash'
+                        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    <Coins size={18} />
+                    {t('cash')}
+                  </button>
+                  <button
+                    onClick={() => setPaymentType('bank')}
+                    className={`flex items-center justify-center gap-2 py-3 rounded-xl font-medium transition-all duration-200 ${
+                      paymentType === 'bank'
+                        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    <Landmark size={18} />
+                    {t('bank')}
+                  </button>
+                </div>
+              </div>
+
+              {/* Cash Payment Fields */}
+              {paymentType === 'cash' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      {t('clientGiven')}
+                    </label>
+                    <div className="relative">
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                        <DollarSign size={18} />
+                      </div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={clientGiven}
+                        onChange={(e) => setClientGiven(parseFloat(e.target.value) || 0)}
+                        className="w-full pl-11 pr-4 py-3 text-xl font-semibold bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:border-emerald-500 transition-all"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className={`p-4 rounded-xl ${change > 0 ? 'bg-amber-50 dark:bg-amber-950/30' : 'bg-green-50 dark:bg-green-950/30'}`}>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 dark:text-gray-400">{t('change')}:</span>
+                      <span className={`font-bold text-xl ${change > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                        {change.toFixed(2)} zł
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Bank Payment Info */}
+              {paymentType === 'bank' && (
+                <div className="bg-blue-50 dark:bg-blue-950/30 rounded-xl p-5 text-center">
+                  <Landmark size={32} className="text-blue-500 mx-auto mb-2" />
+                  <p className="text-blue-700 dark:text-blue-300 font-medium">
+                    {t('totalAmount')} {order.price} zł
+                  </p>
+                  <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                    {t('bankTransferInfo')}
+                  </p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={handleAcceptPayment}
+                  className="flex-1 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold rounded-xl transition-all duration-200 transform active:scale-[0.98] shadow-md flex items-center justify-center gap-2"
+                >
+                  <CheckCircle size={18} />
+                  {t('acceptPayment')}
+                </button>
+                <button
+                  onClick={() => setShowPaymentForm(false)}
+                  className="flex-1 py-3.5 rounded-xl border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
+                >
+                  {t('cancel')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Chat Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div className="p-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
-          <h2 className="font-semibold text-lg flex items-center gap-2">
-            <MessageSquare size={20} className="text-blue-500" />
-            {chatT('adminChat')}
-          </h2>
-        </div>
-        <div className="h-[500px]">
-          <OrderChat orderId={id} isAdmin={false} />
-        </div>
+      <div className="mt-8">
+        <OrderChat orderId={id} isAdmin={false} />
       </div>
 
       {/* Footer Note */}

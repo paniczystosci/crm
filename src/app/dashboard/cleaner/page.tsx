@@ -1,4 +1,3 @@
-// src/app/dashboard/cleaner/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -6,7 +5,7 @@ import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { Calendar, MapPin, Phone, ArrowRight, Plus, Filter, Clock, User, DollarSign, AlertCircle } from 'lucide-react'
+import { Calendar, MapPin, Phone, ArrowRight, Plus, Filter, Clock, User, DollarSign, AlertCircle, CheckCircle } from 'lucide-react'
 import { UnreadBadge } from '@/components/UnreadBadge'
 
 type Order = {
@@ -33,6 +32,7 @@ export default function CleanerOrders() {
   const [error, setError] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [checkingRole, setCheckingRole] = useState(true)
+  const [acceptingId, setAcceptingId] = useState<string | null>(null)
 
   const router = useRouter()
   const supabase = createClient()
@@ -61,8 +61,89 @@ export default function CleanerOrders() {
     cancelled: '❌',
   }
 
-  useEffect(() => {
-    const init = async () => {
+useEffect(() => {
+  const init = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      router.push('/auth/login')
+      return
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (profile?.role === 'admin') {
+      router.replace('/dashboard/admin')
+      return
+    }
+    
+    setUserId(user.id)
+    setCheckingRole(false)
+    await fetchOrders() // Теперь fetchOrders загрузит заказы с текущим filter
+  }
+
+  init()
+}, [filter]) // 👈 ДОБАВЬТЕ filter в зависимости
+
+async function fetchOrders() {
+  setLoading(true)
+  setError(null)
+
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      router.push('/auth/login')
+      return
+    }
+
+    // Загружаем все заказы
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Supabase error:', error)
+      setError(ordersT('loadError'))
+      setOrders([])
+    } else {
+      // 🔧 ФИЛЬТРАЦИЯ: только новые заказы ИЛИ свои
+      let filteredOrders = (data || []).filter(order => {
+        const isNew = order.status === 'new'
+        const isMine = order.cleaner_id === user.id
+        
+        // Отладка для каждого заказа
+        console.log(`Order ${order.id}: status=${order.status}, cleaner_id=${order.cleaner_id}, isNew=${isNew}, isMine=${isMine}, include=${isNew || isMine}`)
+        
+        return isNew || isMine
+      })
+      
+      // Применяем фильтр по статусу (если выбран не 'all')
+      if (filter !== 'all') {
+        filteredOrders = filteredOrders.filter(order => order.status === filter)
+      }
+      
+      console.log('Final filtered orders:', filteredOrders.length)
+      setOrders(filteredOrders)
+    }
+  } catch (err) {
+    console.error('Unexpected error:', err)
+    setError(ordersT('loadError'))
+    setOrders([])
+  } finally {
+    setLoading(false)
+  }
+}
+
+  const acceptOrder = async (orderId: string) => {
+    setAcceptingId(orderId)
+    
+    try {
       const { data: { user } } = await supabase.auth.getUser()
       
       if (!user) {
@@ -70,63 +151,28 @@ export default function CleanerOrders() {
         return
       }
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (profile?.role === 'admin') {
-        router.replace('/dashboard/admin')
-        return
-      }
-      
-      setUserId(user.id)
-      setCheckingRole(false)
-      await fetchOrders()
-    }
-
-    init()
-  }, [])
-
-  async function fetchOrders() {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-      if (authError || !user) {
-        console.error('Пользователь не авторизован:', authError)
-        router.push('/auth/login')
-        return
-      }
-
-      let query = supabase
+      const { error } = await supabase
         .from('orders')
-        .select('*')
-        .eq('cleaner_id', user.id)
-        .order('created_at', { ascending: false })
-
-      if (filter !== 'all') {
-        query = query.eq('status', filter)
-      }
-
-      const { data, error } = await query
+        .update({ 
+          cleaner_id: user.id,
+          status: 'accepted' 
+        })
+        .eq('id', orderId)
 
       if (error) {
-        console.error('Supabase error in fetchOrders:', error)
-        setError(ordersT('loadError'))
-        setOrders([])
+        console.error('Error accepting order:', error)
+        alert(ordersT('loadError'))
       } else {
-        setOrders(data || [])
+        // Обновляем список заказов
+        await fetchOrders()
+        // Переходим на страницу заказа
+        router.push(`/dashboard/cleaner/orders/${orderId}`)
       }
     } catch (err) {
-      console.error('Неожиданная ошибка:', err)
-      setError(ordersT('loadError'))
-      setOrders([])
+      console.error('Unexpected error:', err)
+      alert(ordersT('loadError'))
     } finally {
-      setLoading(false)
+      setAcceptingId(null)
     }
   }
 
@@ -297,7 +343,7 @@ export default function CleanerOrders() {
             <div>
               <p className="text-xl font-medium text-gray-900 dark:text-white">{ordersT('noOrders')}</p>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                {filter !== 'all' ? `${ordersT('noOrders')} ${ordersT('status')} "${statusLabels[filter]}"` : ordersT('noOrders')}
+                {filter !== 'all' ? `${ordersT('noOrders')} со статусом "${statusLabels[filter as keyof typeof statusLabels]}"` : ordersT('noOrders')}
               </p>
               {filter === 'all' && (
                 <Link
@@ -314,9 +360,8 @@ export default function CleanerOrders() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {orders.map((order, idx) => (
-            <Link
+            <div
               key={order.id}
-              href={`/dashboard/cleaner/orders/${order.id}`}
               className="group animate-in slide-in-from-bottom-4 duration-500 relative"
               style={{ animationDelay: `${idx * 50}ms` }}
             >
@@ -365,15 +410,14 @@ export default function CleanerOrders() {
                       </div>
                     )}
 
-                    {/* Длительность уборки */}
-{order.planned_time && order.duration && (
-  <div className="flex items-center gap-2.5">
-    <Clock size={16} className="text-gray-400 flex-shrink-0" />
-    <span className="text-gray-600 dark:text-gray-400">
-      {order.planned_time.slice(0, 5)} • {order.duration} {t('minutes')}
-    </span>
-  </div>
-)}
+                    {order.planned_time && order.duration && (
+                      <div className="flex items-center gap-2.5">
+                        <Clock size={16} className="text-gray-400 flex-shrink-0" />
+                        <span className="text-gray-600 dark:text-gray-400">
+                          {order.planned_time.slice(0, 5)} • {order.duration} {t('minutes')}
+                        </span>
+                      </div>
+                    )}
 
                     <div className="flex items-center gap-2.5">
                       <Phone size={16} className="text-gray-400 flex-shrink-0" />
@@ -382,15 +426,40 @@ export default function CleanerOrders() {
                   </div>
                 </div>
 
-                {/* Footer */}
-                <div className="px-5 py-3 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-700 flex justify-end">
-                  <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-sm font-medium group-hover:gap-2 transition-all">
+                {/* Footer - Кнопки действий */}
+                <div className="px-5 py-3 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center gap-3">
+                  {order.status === 'new' ? (
+                    <button
+                      onClick={() => acceptOrder(order.id)}
+                      disabled={acceptingId === order.id}
+                      className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl text-sm font-medium transition-all duration-200"
+                    >
+                      {acceptingId === order.id ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                          <span>{t('loading')}</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle size={16} />
+                          <span>{ordersT('accept')}</span>
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="flex-1"></div>
+                  )}
+                  
+                  <Link
+                    href={`/dashboard/cleaner/orders/${order.id}`}
+                    className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-sm font-medium group-hover:gap-2 transition-all"
+                  >
                     {ordersT('details')}
                     <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
-                  </span>
+                  </Link>
                 </div>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       )}

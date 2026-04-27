@@ -8,7 +8,7 @@ async function detectBrowserLocale(): Promise<string> {
     const acceptLanguage = headersList.get('accept-language') || '';
     const preferredLocale = acceptLanguage.split(',')[0]?.split('-')[0] || '';
     
-    const supportedLocales = ['ru', 'pl', 'en', 'de'];
+    const supportedLocales = ['uk', 'pl', 'en', 'de'];
     
     if (supportedLocales.includes(preferredLocale)) {
       return preferredLocale;
@@ -17,7 +17,7 @@ async function detectBrowserLocale(): Promise<string> {
     console.error('Error detecting browser locale:', error);
   }
   
-  return 'ru';
+  return 'uk';
 }
 
 export default getRequestConfig(async () => {
@@ -29,9 +29,9 @@ export default getRequestConfig(async () => {
     locale = await detectBrowserLocale();
   }
   
-  const validLocales = ['ru', 'pl', 'en', 'de'];
+  const validLocales = ['uk', 'pl', 'en', 'de'];
   if (!validLocales.includes(locale)) {
-    locale = 'ru';
+    locale = 'uk';
   }
   
   return {
