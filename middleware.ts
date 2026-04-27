@@ -1,12 +1,36 @@
-// src/middleware.ts
 import { createServerClient } from '@supabase/ssr'
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
+
+// Страницы, доступные без авторизации
+const publicPages = [
+  '/auth/login',
+  '/auth/signup',
+  '/auth/callback',
+  '/auth/reset-password',
+]
+
+// Пути, которые middleware вообще не должен обрабатывать
+const excludedPaths = [
+  '/_next',            // статика Next.js
+  '/api/auth',         // API-роуты авторизации
+  '/auth/v1',          // запросы к Supabase API
+  '/favicon.ico',      // иконка
+]
 
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  })
+  const { pathname } = request.nextUrl
+
+  // 1. Пропускаем исключённые пути мгновенно, без дальнейших проверок
+  if (excludedPaths.some(path => pathname.startsWith(path))) {
+    return NextResponse.next()
+  }
+
+  // 2. Пропускаем публичные страницы (логин, регистрация, callback)
+  if (publicPages.some(page => pathname === page || pathname.startsWith(page))) {
+    return NextResponse.next()
+  }
+
+  let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,49 +41,50 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value, options }) => {
+            request.cookies.set(name, value)
             supabaseResponse.cookies.set(name, value, options)
-          )
+          })
         },
       },
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
-  const pathname = request.nextUrl.pathname
+  // 3. Проверяем сессию только для защищённых маршрутов
+  const { data: { session } } = await supabase.auth.getSession()
 
-  // Если пользователь не авторизован и пытается зайти в дашборд
-  if (!user && pathname.startsWith('/dashboard')) {
-    return NextResponse.redirect(new URL('/auth/login', request.url))
+  if (!session) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/auth/login'
+    return NextResponse.redirect(url)
   }
 
-  // Если пользователь авторизован
-  if (user) {
+  // 4. Проверка ролей для админки и панели клинера
+  if (pathname.startsWith('/dashboard/admin')) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
-      .eq('id', user.id)
+      .eq('id', session.user.id)
       .single()
-    
-    const isAdmin = profile?.role === 'admin'
 
-    // Если пользователь на главной дашборда - редирект по роли
-    if (pathname === '/dashboard') {
-      if (isAdmin) {
-        return NextResponse.redirect(new URL('/dashboard/admin', request.url))
-      } else {
-        return NextResponse.redirect(new URL('/dashboard/cleaner', request.url))
-      }
+    if (profile?.role !== 'admin') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard/cleaner'
+      return NextResponse.redirect(url)
     }
+  }
 
-    // Защита: клинер не может зайти в админ-панель
-    if (!isAdmin && pathname.startsWith('/dashboard/admin')) {
-      return NextResponse.redirect(new URL('/dashboard/cleaner', request.url))
-    }
+  if (pathname.startsWith('/dashboard/cleaner')) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single()
 
-    // Защита: админ не может зайти в панель клинера
-    if (isAdmin && pathname.startsWith('/dashboard/cleaner')) {
-      return NextResponse.redirect(new URL('/dashboard/admin', request.url))
+    if (profile?.role !== 'cleaner') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard/admin'
+      return NextResponse.redirect(url)
     }
   }
 
@@ -68,7 +93,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/dashboard/:path*',
-    '/auth/:path*',
+    // Исключаем статические файлы и изображения
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
