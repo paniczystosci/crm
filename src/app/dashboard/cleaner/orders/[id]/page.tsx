@@ -70,16 +70,16 @@ export default function CleanerOrderDetail() {
   // Трекер времени (обратный отсчёт)
   const [trackerRunning, setTrackerRunning] = useState(false)
   const [remainingSeconds, setRemainingSeconds] = useState(0)
-  const [initialDurationSeconds, setInitialDurationSeconds] = useState(0)
+  const [totalDurationSeconds, setTotalDurationSeconds] = useState(0)
   const [isInitialized, setIsInitialized] = useState(false)
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const supabase = createClient()
 
-  // ЕДИНАЯ ФОРМУЛА РАСЧЁТА (как у админа)
-  const calculateRemainingSeconds = useCallback((startTime: string, durationMinutes: number): number => {
+  // Функция расчёта оставшегося времени ОТ start_time (как у админа)
+  const calculateRemaining = useCallback((startTime: string, totalDurationSec: number): number => {
     const startMs = new Date(startTime).getTime()
-    const durationMs = durationMinutes * 60 * 1000
+    const durationMs = totalDurationSec * 1000  // totalDurationSec уже в секундах
     const endMs = startMs + durationMs
     return Math.max(0, Math.ceil((endMs - Date.now()) / 1000))
   }, [])
@@ -110,19 +110,17 @@ export default function CleanerOrderDetail() {
 
   // Эффект для трекера времени
   useEffect(() => {
-    if (trackerRunning && order?.start_time && order?.duration) {
+    if (trackerRunning && order?.start_time && totalDurationSeconds > 0) {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
       
       timerIntervalRef.current = setInterval(() => {
-        const durationMinutes = parseInt(order.duration || '60')
-        const remaining = calculateRemainingSeconds(order.start_time!, durationMinutes)
+        const remaining = calculateRemaining(order.start_time!, totalDurationSeconds)
         
         setRemainingSeconds(remaining)
         
         if (remaining <= 0) {
           if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
           setTrackerRunning(false)
-          // НЕ вызываем автоматическое завершение — только останавливаем таймер
         }
       }, 1000)
     } else {
@@ -132,7 +130,7 @@ export default function CleanerOrderDetail() {
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
     }
-  }, [trackerRunning, order?.start_time, order?.duration, calculateRemainingSeconds])
+  }, [trackerRunning, order?.start_time, totalDurationSeconds, calculateRemaining])
 
   useEffect(() => {
     fetchOrder()
@@ -148,7 +146,6 @@ export default function CleanerOrderDetail() {
     setError(null)
 
     try {
-      // Проверка сессии
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
         router.push('/auth/login')
@@ -166,7 +163,6 @@ export default function CleanerOrderDetail() {
         return
       }
 
-      // Проверка доступа — клинер видит только свои заказы или новые
       if (data.status !== 'new' && data.cleaner_id !== session.user.id) {
         setError(errorsT('accessDenied'))
         return
@@ -175,19 +171,18 @@ export default function CleanerOrderDetail() {
       setOrder(data)
       setClientGiven(data.price)
       
-      // Рассчитываем длительность из БД
-      const durationMinutes = parseInt(data.duration || '60')
-      const durationSeconds = durationMinutes * 60
-      setInitialDurationSeconds(durationSeconds)
+      // КОНВЕРТИРУЕМ ОДИН РАЗ: duration из БД в секунды
+      const durationMinutes = parseInt(data.duration || '60')  // 240
+      const durationSeconds = durationMinutes * 60              // 14400 секунд
+      setTotalDurationSeconds(durationSeconds)
       
       if (data.status === 'in_progress' && data.start_time && !data.end_time) {
-        // Активная уборка — используем единую формулу расчёта
-        const remaining = calculateRemainingSeconds(data.start_time, durationMinutes)
+        // Активная уборка — расчёт от start_time через единую функцию
+        const remaining = calculateRemaining(data.start_time, durationSeconds)
         
         setRemainingSeconds(remaining)
         
         if (remaining <= 0) {
-          // Время вышло, но заказ ещё не завершён администратором
           setTrackerRunning(false)
         } else {
           setTrackerRunning(true)
@@ -196,6 +191,7 @@ export default function CleanerOrderDetail() {
         setRemainingSeconds(0)
         setTrackerRunning(false)
       } else {
+        // Новый заказ — полное время
         setRemainingSeconds(durationSeconds)
         setTrackerRunning(false)
       }
@@ -248,7 +244,7 @@ export default function CleanerOrderDetail() {
       .eq('id', id)
     
     if (!error) {
-      setRemainingSeconds(initialDurationSeconds)
+      setRemainingSeconds(totalDurationSeconds)
       setTrackerRunning(true)
       setOrder(prev => prev ? {...prev, status: 'in_progress', start_time: nowISO} : null)
     }
@@ -258,9 +254,7 @@ export default function CleanerOrderDetail() {
     if (!trackerRunning) return
     
     // Сохраняем промежуточное время в БД
-    const durationMinutes = parseInt(order?.duration || '60')
-    const totalSeconds = durationMinutes * 60
-    const elapsedSeconds = totalSeconds - remainingSeconds
+    const elapsedSeconds = totalDurationSeconds - remainingSeconds
     const totalMinutes = Math.floor(elapsedSeconds / 60)
     
     await supabase
@@ -280,19 +274,15 @@ export default function CleanerOrderDetail() {
     if (!order) return
     setTrackerRunning(false)
     
-    const durationMinutes = parseInt(order.duration || '60')
-    const totalSeconds = durationMinutes * 60
-    const elapsedSeconds = totalSeconds - remainingSeconds
+    const elapsedSeconds = totalDurationSeconds - remainingSeconds
     const totalMinutes = Math.max(1, Math.floor(elapsedSeconds / 60))
     const nowISO = new Date().toISOString()
     
-    // Только записываем время, НЕ меняем статус!
     const { error } = await supabase
       .from('orders')
       .update({ 
         end_time: nowISO, 
         total_minutes: totalMinutes
-        // status: 'done' — УБРАНО! Администратор сам сменит статус
       })
       .eq('id', id)
     
@@ -301,7 +291,6 @@ export default function CleanerOrderDetail() {
         ...prev,
         end_time: nowISO,
         total_minutes: totalMinutes
-        // status остаётся 'in_progress'
       } : null)
       setShowPaymentForm(true)
     }
@@ -373,9 +362,9 @@ export default function CleanerOrderDetail() {
   }
 
   const getProgressPercent = () => {
-    if (initialDurationSeconds === 0) return 0
-    const elapsed = initialDurationSeconds - remainingSeconds
-    return Math.min(100, Math.max(0, (elapsed / initialDurationSeconds) * 100))
+    if (totalDurationSeconds === 0) return 0
+    const elapsed = totalDurationSeconds - remainingSeconds
+    return Math.min(100, Math.max(0, (elapsed / totalDurationSeconds) * 100))
   }
 
   if (loading) {
@@ -602,7 +591,7 @@ export default function CleanerOrderDetail() {
         </div>
       )}
 
-      {/* Время вышло — показываем сообщение, не завершаем автоматически */}
+      {/* Время вышло */}
       {isInProgress && timeExpired && (
         <div className="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 rounded-2xl p-6 border border-green-200 dark:border-green-800">
           <div className="flex flex-col items-center text-center gap-3">
