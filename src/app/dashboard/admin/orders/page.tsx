@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
-import { Calendar, Clock, User, DollarSign, Package, Filter, ChevronRight, Timer, Play } from 'lucide-react'
+import { Calendar, Clock, User, DollarSign, Package, Filter, ChevronRight } from 'lucide-react'
 import { UnreadBadge } from '@/components/UnreadBadge'
 
 type Order = {
@@ -31,19 +31,8 @@ export default function AdminOrders() {
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
-  
-  const [remainingTimes, setRemainingTimes] = useState<Record<string, number>>({})
-  const timerIntervalsRef = useRef<Record<string, NodeJS.Timeout>>({})
 
   const supabase = createClient()
-
-  // ЕДИНАЯ ФОРМУЛА РАСЧЁТА ОСТАВШЕГОСЯ ВРЕМЕНИ
-  const calculateRemainingSeconds = useCallback((startTime: string, durationMinutes: number): number => {
-    const startMs = new Date(startTime).getTime()
-    const durationMs = durationMinutes * 60 * 1000
-    const endMs = startMs + durationMs
-    return Math.max(0, Math.ceil((endMs - Date.now()) / 1000))
-  }, [])
 
   const statusLabels: Record<string, string> = {
     new: ordersT('status.new'),
@@ -75,49 +64,11 @@ export default function AdminOrders() {
       setUserId(user?.id || null)
     }
     getUser()
-    fetchOrders()
+  }, [])
 
-    return () => {
-      Object.values(timerIntervalsRef.current).forEach(clearInterval)
-      timerIntervalsRef.current = {}
-    }
-  }, [filterStatus])
-
-  // Управление таймерами
   useEffect(() => {
-    Object.values(timerIntervalsRef.current).forEach(clearInterval)
-    timerIntervalsRef.current = {}
-
-    orders.forEach(order => {
-      if (order.status === 'in_progress' && order.start_time && !order.end_time && order.duration) {
-        startTimerForOrder(order)
-      }
-    })
-
-    return () => {
-      Object.values(timerIntervalsRef.current).forEach(clearInterval)
-    }
-  }, [orders])
-
-  const startTimerForOrder = useCallback((order: Order) => {
-    if (!order.start_time || !order.duration) return
-
-    const updateTimer = () => {
-      const remaining = calculateRemainingSeconds(order.start_time!, order.duration!)
-      
-      setRemainingTimes(prev => ({ ...prev, [order.id]: remaining }))
-
-      if (remaining <= 0) {
-        if (timerIntervalsRef.current[order.id]) {
-          clearInterval(timerIntervalsRef.current[order.id])
-          delete timerIntervalsRef.current[order.id]
-        }
-      }
-    }
-
-    updateTimer()
-    timerIntervalsRef.current[order.id] = setInterval(updateTimer, 1000)
-  }, [calculateRemainingSeconds])
+    fetchOrders()
+  }, [filterStatus])
 
   async function fetchOrders() {
     setLoading(true)
@@ -156,49 +107,9 @@ export default function AdminOrders() {
     return `${minutes} ${t('minutes')}`
   }
 
-  const formatSeconds = (seconds: number) => {
-    const h = Math.floor(seconds / 3600)
-    const m = Math.floor((seconds % 3600) / 60)
-    const s = seconds % 60
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-  }
-
-  const getCleaningTimeDisplay = (order: Order) => {
-    if (order.status === 'in_progress' && order.start_time && !order.end_time) {
-      const remaining = remainingTimes[order.id]
-      if (remaining !== undefined) {
-        return `⏱️ ${formatSeconds(remaining)}`
-      }
-      if (order.duration) {
-        return `⏱️ ${formatDuration(order.duration)}`
-      }
-      return null
-    }
-
-    if (order.total_minutes && order.total_minutes > 0) {
-      return `✅ ${formatDuration(order.total_minutes)}`
-    }
-
-    if (order.duration) {
-      return `⏰ ${formatDuration(order.duration)}`
-    }
-    return null
-  }
-
-  const getProgressPercent = (order: Order) => {
-    if (order.status !== 'in_progress' || !order.duration) return 0
-    const remaining = remainingTimes[order.id]
-    if (remaining === undefined) return 0
-
-    const total = order.duration * 60
-    const elapsed = total - remaining
-    return Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)))
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
-        {/* Header */}
         <div className="mb-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
@@ -231,7 +142,6 @@ export default function AdminOrders() {
           </div>
         </div>
 
-        {/* Filter Buttons */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-3">
             <Filter size={16} className="text-gray-400" />
@@ -269,7 +179,6 @@ export default function AdminOrders() {
           </div>
         </div>
 
-        {/* Orders List */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="animate-spin rounded-full h-12 w-12 border-2 border-emerald-600 border-t-transparent" />
@@ -282,113 +191,79 @@ export default function AdminOrders() {
           </div>
         ) : (
           <div className="space-y-4">
-            {orders.map((order, idx) => {
-              const cleaningTimeDisplay = getCleaningTimeDisplay(order)
-              const isInProgress = order.status === 'in_progress'
-              const progressPercent = getProgressPercent(order)
+            {orders.map((order, idx) => (
+              <Link
+                key={order.id}
+                href={`/dashboard/admin/orders/${order.id}`}
+                className="group block animate-in slide-in-from-bottom-4 duration-500"
+                style={{ animationDelay: `${idx * 50}ms` }}
+              >
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 relative">
+                  <UnreadBadge orderId={order.id} userId={userId || undefined} />
 
-              return (
-                <Link
-                  key={order.id}
-                  href={`/dashboard/admin/orders/${order.id}`}
-                  className="group block animate-in slide-in-from-bottom-4 duration-500"
-                  style={{ animationDelay: `${idx * 50}ms` }}
-                >
-                  <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 relative">
-                    <UnreadBadge orderId={order.id} userId={userId || undefined} />
+                  <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-3 mb-3">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full font-medium ${statusColors[order.status]}`}>
+                          <span>{statusIcons[order.status]}</span>
+                          <span>{statusLabels[order.status]}</span>
+                        </span>
+                        <span className="text-xs text-gray-400 font-mono">#{order.id.slice(0, 8)}</span>
+                      </div>
 
-                    <div className="flex flex-col lg:flex-row lg:items-center gap-6">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-3 mb-3">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full font-medium ${statusColors[order.status]}`}>
-                            <span>{statusIcons[order.status]}</span>
-                            <span>{statusLabels[order.status]}</span>
-                          </span>
-                          <span className="text-xs text-gray-400 font-mono">#{order.id.slice(0, 8)}</span>
+                      <h3 className="font-bold text-xl text-gray-900 dark:text-white mb-2 line-clamp-1">
+                        {order.client_name}
+                      </h3>
 
-                          {isInProgress && (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full font-medium bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 animate-pulse">
-                              <Play size={12} /> {ordersT('cleaningInProgress')}
-                            </span>
-                          )}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                          <User size={16} className="flex-shrink-0 text-gray-400" />
+                          <span className="truncate">{order.address}</span>
                         </div>
-
-                        <h3 className="font-bold text-xl text-gray-900 dark:text-white mb-2 line-clamp-1">
-                          {order.client_name}
-                        </h3>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                        {order.planned_date && (
                           <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                            <User size={16} className="flex-shrink-0 text-gray-400" />
-                            <span className="truncate">{order.address}</span>
-                          </div>
-                          {order.planned_date && (
-                            <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                              <Calendar size={16} className="text-gray-400" />
-                              <span>{new Date(order.planned_date).toLocaleDateString('ru-RU')}</span>
-                              {order.planned_time && (
-                                <>
-                                  <Clock size={14} className="text-gray-400 ml-1" />
-                                  <span>{order.planned_time.slice(0, 5)}</span>
-                                </>
-                              )}
-                            </div>
-                          )}
-                          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                            <DollarSign size={16} className="text-gray-400" />
-                            <span className="font-semibold text-emerald-600 dark:text-emerald-400">{order.price} zł</span>
-                          </div>
-                        </div>
-
-                        {cleaningTimeDisplay && (
-                          <div className="mt-3">
-                            <div className="flex items-center gap-2">
-                              <Timer size={14} className="text-gray-400" />
-                              <span className={`text-sm font-medium ${isInProgress ? 'text-blue-600 dark:text-blue-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                                {cleaningTimeDisplay}
-                              </span>
-                            </div>
-
-                            {isInProgress && progressPercent > 0 && (
-                              <div className="mt-2">
-                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
-                                  <div 
-                                    className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
-                                    style={{ width: `${progressPercent}%` }}
-                                  />
-                                </div>
-                              </div>
+                            <Calendar size={16} className="text-gray-400" />
+                            <span>{new Date(order.planned_date).toLocaleDateString('ru-RU')}</span>
+                            {order.planned_time && (
+                              <>
+                                <Clock size={14} className="text-gray-400 ml-1" />
+                                <span>{order.planned_time.slice(0, 5)}</span>
+                              </>
                             )}
                           </div>
                         )}
-                      </div>
-
-                      <div className="flex items-center justify-between lg:justify-end gap-6 lg:border-l lg:border-gray-200 dark:lg:border-gray-700 lg:pl-6">
-                        {order.profiles?.full_name && (
-                          <div className="text-right">
-                            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">{ordersT('cleaner')}</div>
-                            <div className="flex items-center gap-2">
-                              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
-                                <span className="text-white text-xs font-medium">
-                                  {order.profiles.full_name[0]?.toUpperCase()}
-                                </span>
-                              </div>
-                              <span className="font-medium text-gray-900 dark:text-white">
-                                {order.profiles.full_name}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-medium group-hover:gap-3 transition-all">
-                          <span className="text-sm">{ordersT('details')}</span>
-                          <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                          <DollarSign size={16} className="text-gray-400" />
+                          <span className="font-semibold text-emerald-600 dark:text-emerald-400">{order.price} zł</span>
                         </div>
                       </div>
                     </div>
+
+                    <div className="flex items-center justify-between lg:justify-end gap-6 lg:border-l lg:border-gray-200 dark:lg:border-gray-700 lg:pl-6">
+                      {order.profiles?.full_name && (
+                        <div className="text-right">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">{ordersT('cleaner')}</div>
+                          <div className="flex items-center gap-2">
+                            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
+                              <span className="text-white text-xs font-medium">
+                                {order.profiles.full_name[0]?.toUpperCase()}
+                              </span>
+                            </div>
+                            <span className="font-medium text-gray-900 dark:text-white">
+                              {order.profiles.full_name}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-medium group-hover:gap-3 transition-all">
+                        <span className="text-sm">{ordersT('details')}</span>
+                        <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                      </div>
+                    </div>
                   </div>
-                </Link>
-              )
-            })}
+                </div>
+              </Link>
+            ))}
           </div>
         )}
 
