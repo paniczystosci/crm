@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useParams, useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -73,10 +73,16 @@ export default function CleanerOrderDetail() {
   const [initialDurationSeconds, setInitialDurationSeconds] = useState(0)
   const [isInitialized, setIsInitialized] = useState(false)
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const timerStartTimeRef = useRef<Date | null>(null)
-  const remainingAtPauseRef = useRef(0)
 
   const supabase = createClient()
+
+  // ЕДИНАЯ ФОРМУЛА РАСЧЁТА (как у админа)
+  const calculateRemainingSeconds = useCallback((startTime: string, durationMinutes: number): number => {
+    const startMs = new Date(startTime).getTime()
+    const durationMs = durationMinutes * 60 * 1000
+    const endMs = startMs + durationMs
+    return Math.max(0, Math.ceil((endMs - Date.now()) / 1000))
+  }, [])
 
   const statusLabels: Record<string, string> = {
     new: ordersT('status.new'),
@@ -104,18 +110,19 @@ export default function CleanerOrderDetail() {
 
   // Эффект для трекера времени
   useEffect(() => {
-    if (trackerRunning && timerStartTimeRef.current) {
+    if (trackerRunning && order?.start_time && order?.duration) {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
+      
       timerIntervalRef.current = setInterval(() => {
-        const now = new Date()
-        const elapsedSinceStart = Math.floor((now.getTime() - timerStartTimeRef.current!.getTime()) / 1000)
-        const remaining = Math.max(0, remainingAtPauseRef.current - elapsedSinceStart)
+        const durationMinutes = parseInt(order.duration || '60')
+        const remaining = calculateRemainingSeconds(order.start_time!, durationMinutes)
+        
         setRemainingSeconds(remaining)
         
         if (remaining <= 0) {
           if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
           setTrackerRunning(false)
-          handleStopTimerAutomatically()
+          // НЕ вызываем автоматическое завершение — только останавливаем таймер
         }
       }, 1000)
     } else {
@@ -125,37 +132,25 @@ export default function CleanerOrderDetail() {
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
     }
-  }, [trackerRunning])
-
-  // Автоматическое завершение
-  const handleStopTimerAutomatically = async () => {
-    if (!order) return
-    
-    const nowISO = new Date().toISOString()
-    await supabase
-      .from('orders')
-      .update({ 
-        end_time: nowISO, 
-        total_minutes: Math.floor(initialDurationSeconds / 60),
-        status: 'done'
-      })
-      .eq('id', id)
-    
-    fetchOrder()
-    setShowPaymentForm(true)
-  }
+  }, [trackerRunning, order?.start_time, order?.duration, calculateRemainingSeconds])
 
   useEffect(() => {
     fetchOrder()
   }, [id])
+
+  const handleRefresh = useCallback(async () => {
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
+    await fetchOrder()
+  }, [])
 
   async function fetchOrder() {
     setLoading(true)
     setError(null)
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
+      // Проверка сессии
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
         router.push('/auth/login')
         return
       }
@@ -168,39 +163,44 @@ export default function CleanerOrderDetail() {
 
       if (error || !data) {
         setError(errorsT('orderNotFound'))
-      } else {
-        if (data.status === 'new' || data.cleaner_id === user.id) {
-          setOrder(data)
-          setClientGiven(data.price)
-          
-          // Рассчитываем длительность
-          const durationMinutes = parseInt(data.duration || '60')
-          const durationSeconds = durationMinutes * 60
-          setInitialDurationSeconds(durationSeconds)
-          
-          if (data.status === 'in_progress' && data.start_time) {
-            const start = new Date(data.start_time)
-            const now = new Date()
-            const elapsed = Math.floor((now.getTime() - start.getTime()) / 1000)
-            const remaining = Math.max(0, durationSeconds - elapsed)
-            
-            setRemainingSeconds(remaining)
-            remainingAtPauseRef.current = remaining
-            timerStartTimeRef.current = now
-            setTrackerRunning(true)
-          } else if (data.status === 'done') {
-            setRemainingSeconds(0)
-            setTrackerRunning(false)
-          } else {
-            setRemainingSeconds(durationSeconds)
-            remainingAtPauseRef.current = durationSeconds
-            setTrackerRunning(false)
-          }
-          setIsInitialized(true)
-        } else {
-          setError(errorsT('accessDenied'))
-        }
+        return
       }
+
+      // Проверка доступа — клинер видит только свои заказы или новые
+      if (data.status !== 'new' && data.cleaner_id !== session.user.id) {
+        setError(errorsT('accessDenied'))
+        return
+      }
+
+      setOrder(data)
+      setClientGiven(data.price)
+      
+      // Рассчитываем длительность из БД
+      const durationMinutes = parseInt(data.duration || '60')
+      const durationSeconds = durationMinutes * 60
+      setInitialDurationSeconds(durationSeconds)
+      
+      if (data.status === 'in_progress' && data.start_time && !data.end_time) {
+        // Активная уборка — используем единую формулу расчёта
+        const remaining = calculateRemainingSeconds(data.start_time, durationMinutes)
+        
+        setRemainingSeconds(remaining)
+        
+        if (remaining <= 0) {
+          // Время вышло, но заказ ещё не завершён администратором
+          setTrackerRunning(false)
+        } else {
+          setTrackerRunning(true)
+        }
+      } else if (data.status === 'done') {
+        setRemainingSeconds(0)
+        setTrackerRunning(false)
+      } else {
+        setRemainingSeconds(durationSeconds)
+        setTrackerRunning(false)
+      }
+      
+      setIsInitialized(true)
     } catch (err) {
       setError(errorsT('loadError'))
     } finally {
@@ -212,12 +212,16 @@ export default function CleanerOrderDetail() {
     if (!order) return
     setUpdating(true)
     
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      router.push('/auth/login')
+      return
+    }
     
     const updates: any = { status: newStatus }
     
     if (newStatus === 'accepted' && !order.cleaner_id) {
-      updates.cleaner_id = user?.id
+      updates.cleaner_id = session.user.id
     }
     
     const { error } = await supabase
@@ -225,7 +229,7 @@ export default function CleanerOrderDetail() {
       .update(updates)
       .eq('id', id)
       
-    if (!error) fetchOrder()
+    if (!error) handleRefresh()
     setUpdating(false)
   }
 
@@ -244,8 +248,6 @@ export default function CleanerOrderDetail() {
       .eq('id', id)
     
     if (!error) {
-      timerStartTimeRef.current = now
-      remainingAtPauseRef.current = initialDurationSeconds
       setRemainingSeconds(initialDurationSeconds)
       setTrackerRunning(true)
       setOrder(prev => prev ? {...prev, status: 'in_progress', start_time: nowISO} : null)
@@ -255,20 +257,22 @@ export default function CleanerOrderDetail() {
   const handlePauseTimer = async () => {
     if (!trackerRunning) return
     
-    const currentRemaining = remainingSeconds
-    remainingAtPauseRef.current = currentRemaining
-    setTrackerRunning(false)
+    // Сохраняем промежуточное время в БД
+    const durationMinutes = parseInt(order?.duration || '60')
+    const totalSeconds = durationMinutes * 60
+    const elapsedSeconds = totalSeconds - remainingSeconds
+    const totalMinutes = Math.floor(elapsedSeconds / 60)
     
-    const elapsedSeconds = initialDurationSeconds - currentRemaining
     await supabase
       .from('orders')
-      .update({ total_minutes: Math.floor(elapsedSeconds / 60) })
+      .update({ total_minutes: totalMinutes })
       .eq('id', id)
+    
+    setTrackerRunning(false)
   }
 
   const handleResumeTimer = () => {
     if (trackerRunning) return
-    timerStartTimeRef.current = new Date()
     setTrackerRunning(true)
   }
 
@@ -276,27 +280,41 @@ export default function CleanerOrderDetail() {
     if (!order) return
     setTrackerRunning(false)
     
-    const elapsedSeconds = initialDurationSeconds - remainingSeconds
+    const durationMinutes = parseInt(order.duration || '60')
+    const totalSeconds = durationMinutes * 60
+    const elapsedSeconds = totalSeconds - remainingSeconds
     const totalMinutes = Math.max(1, Math.floor(elapsedSeconds / 60))
     const nowISO = new Date().toISOString()
     
+    // Только записываем время, НЕ меняем статус!
     const { error } = await supabase
       .from('orders')
       .update({ 
         end_time: nowISO, 
-        total_minutes: totalMinutes,
-        status: 'done'
+        total_minutes: totalMinutes
+        // status: 'done' — УБРАНО! Администратор сам сменит статус
       })
       .eq('id', id)
     
     if (!error) {
-      setOrder(prev => prev ? {...prev, status: 'done', end_time: nowISO, total_minutes: totalMinutes} : null)
+      setOrder(prev => prev ? {
+        ...prev,
+        end_time: nowISO,
+        total_minutes: totalMinutes
+        // status остаётся 'in_progress'
+      } : null)
       setShowPaymentForm(true)
     }
   }
 
   const handleAcceptPayment = async () => {
     if (!order) return
+
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      router.push('/auth/login')
+      return
+    }
 
     const cash = paymentType === 'cash' ? clientGiven : 0
     const bank = paymentType === 'bank' ? order.price : 0
@@ -305,7 +323,6 @@ export default function CleanerOrderDetail() {
     const { error } = await supabase
       .from('orders')
       .update({
-        status: 'done',
         cash_received: cash,
         bank_received: bank,
         change_given: change,
@@ -319,7 +336,7 @@ export default function CleanerOrderDetail() {
     } else {
       alert(paymentsT('paidMessage'))
       setShowPaymentForm(false)
-      fetchOrder()
+      handleRefresh()
     }
   }
 
@@ -358,7 +375,7 @@ export default function CleanerOrderDetail() {
   const getProgressPercent = () => {
     if (initialDurationSeconds === 0) return 0
     const elapsed = initialDurationSeconds - remainingSeconds
-    return (elapsed / initialDurationSeconds) * 100
+    return Math.min(100, Math.max(0, (elapsed / initialDurationSeconds) * 100))
   }
 
   if (loading) {
@@ -395,6 +412,7 @@ export default function CleanerOrderDetail() {
   const isInProgress = order.status === 'in_progress'
   const hasStarted = order.start_time !== null && order.end_time === null
   const progressPercent = getProgressPercent()
+  const timeExpired = remainingSeconds <= 0 && isInitialized
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -519,7 +537,8 @@ export default function CleanerOrderDetail() {
         </div>
       </div>
 
-      {isInProgress && (
+      {/* Таймер для заказов в процессе */}
+      {isInProgress && !timeExpired && (
         <div className="mb-8 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30 rounded-2xl p-6 border border-blue-200 dark:border-blue-800">
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-4">
@@ -579,6 +598,31 @@ export default function CleanerOrderDetail() {
                 </>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Время вышло — показываем сообщение, не завершаем автоматически */}
+      {isInProgress && timeExpired && (
+        <div className="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 rounded-2xl p-6 border border-green-200 dark:border-green-800">
+          <div className="flex flex-col items-center text-center gap-3">
+            <div className="h-16 w-16 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
+              <CheckCircle size={34} className="text-green-600 dark:text-green-400" />
+            </div>
+            <div>
+              <p className="text-lg font-medium text-green-700 dark:text-green-300">
+                {ordersT('cleaningExpired')}
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                {ordersT('waitingAdminCompletion')}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowPaymentForm(true)}
+              className="mt-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium transition-all"
+            >
+              {paymentsT('title')}
+            </button>
           </div>
         </div>
       )}
