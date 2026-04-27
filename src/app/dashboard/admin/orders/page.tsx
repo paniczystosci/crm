@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
@@ -15,10 +15,10 @@ type Order = {
   status: string
   planned_date?: string
   planned_time?: string
-  duration?: number          // ← это длительность в минутах (должна быть 240 для 4 часов)
+  duration?: number
   cleaner_id?: string
   total_minutes?: number
-  start_time?: string        // ← когда уборка реально началась
+  start_time?: string
   end_time?: string
   profiles?: { full_name: string } | null
 }
@@ -36,6 +36,14 @@ export default function AdminOrders() {
   const timerIntervalsRef = useRef<Record<string, NodeJS.Timeout>>({})
 
   const supabase = createClient()
+
+  // ЕДИНАЯ ФОРМУЛА РАСЧЁТА ОСТАВШЕГОСЯ ВРЕМЕНИ
+  const calculateRemainingSeconds = useCallback((startTime: string, durationMinutes: number): number => {
+    const startMs = new Date(startTime).getTime()
+    const durationMs = durationMinutes * 60 * 1000
+    const endMs = startMs + durationMs
+    return Math.max(0, Math.ceil((endMs - Date.now()) / 1000))
+  }, [])
 
   const statusLabels: Record<string, string> = {
     new: ordersT('status.new'),
@@ -91,30 +99,25 @@ export default function AdminOrders() {
     }
   }, [orders])
 
-  const startTimerForOrder = (order: Order) => {
+  const startTimerForOrder = useCallback((order: Order) => {
     if (!order.start_time || !order.duration) return
 
-    const startMs = new Date(order.start_time).getTime()
-    const durationMs = order.duration * 60 * 1000
-    const endMs = startMs + durationMs
-
     const updateTimer = () => {
-      const nowMs = Date.now()
-      let remainingSeconds = Math.ceil((endMs - nowMs) / 1000)
+      const remaining = calculateRemainingSeconds(order.start_time!, order.duration!)
+      
+      setRemainingTimes(prev => ({ ...prev, [order.id]: remaining }))
 
-      if (remainingSeconds < 0) remainingSeconds = 0
-
-      setRemainingTimes(prev => ({ ...prev, [order.id]: remainingSeconds }))
-
-      if (remainingSeconds <= 0) {
-        clearInterval(timerIntervalsRef.current[order.id])
-        delete timerIntervalsRef.current[order.id]
+      if (remaining <= 0) {
+        if (timerIntervalsRef.current[order.id]) {
+          clearInterval(timerIntervalsRef.current[order.id])
+          delete timerIntervalsRef.current[order.id]
+        }
       }
     }
 
     updateTimer()
     timerIntervalsRef.current[order.id] = setInterval(updateTimer, 1000)
-  }
+  }, [calculateRemainingSeconds])
 
   async function fetchOrders() {
     setLoading(true)
@@ -166,7 +169,10 @@ export default function AdminOrders() {
       if (remaining !== undefined) {
         return `⏱️ ${formatSeconds(remaining)}`
       }
-      return `⏱️ ${formatDuration(order.duration)}`
+      if (order.duration) {
+        return `⏱️ ${formatDuration(order.duration)}`
+      }
+      return null
     }
 
     if (order.total_minutes && order.total_minutes > 0) {
@@ -192,7 +198,7 @@ export default function AdminOrders() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
-        {/* Header — без изменений */}
+        {/* Header */}
         <div className="mb-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
@@ -225,7 +231,7 @@ export default function AdminOrders() {
           </div>
         </div>
 
-        {/* Filter Buttons — без изменений */}
+        {/* Filter Buttons */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-3">
             <Filter size={16} className="text-gray-400" />
@@ -302,7 +308,7 @@ export default function AdminOrders() {
 
                           {isInProgress && (
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full font-medium bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 animate-pulse">
-                              <Play size={12} /> Уборка идёт
+                              <Play size={12} /> {ordersT('cleaningInProgress')}
                             </span>
                           )}
                         </div>
