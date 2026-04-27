@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useParams, useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -20,10 +20,7 @@ import {
   Wallet,
   Landmark,
   Coins,
-  X,
-  Play,
-  Pause,
-  Square
+  X
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -67,22 +64,7 @@ export default function CleanerOrderDetail() {
   const [paymentType, setPaymentType] = useState<'cash' | 'bank'>('cash')
   const [clientGiven, setClientGiven] = useState(0)
 
-  // Трекер времени (обратный отсчёт)
-  const [trackerRunning, setTrackerRunning] = useState(false)
-  const [remainingSeconds, setRemainingSeconds] = useState(0)
-  const [totalDurationSeconds, setTotalDurationSeconds] = useState(0)
-  const [isInitialized, setIsInitialized] = useState(false)
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null)
-
   const supabase = createClient()
-
-  // Функция расчёта оставшегося времени ОТ start_time (как у админа)
-  const calculateRemaining = useCallback((startTime: string, totalDurationSec: number): number => {
-    const startMs = new Date(startTime).getTime()
-    const durationMs = totalDurationSec * 1000  // totalDurationSec уже в секундах
-    const endMs = startMs + durationMs
-    return Math.max(0, Math.ceil((endMs - Date.now()) / 1000))
-  }, [])
 
   const statusLabels: Record<string, string> = {
     new: ordersT('status.new'),
@@ -108,36 +90,11 @@ export default function CleanerOrderDetail() {
     cancelled: '❌',
   }
 
-  // Эффект для трекера времени
-  useEffect(() => {
-    if (trackerRunning && order?.start_time && totalDurationSeconds > 0) {
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
-      
-      timerIntervalRef.current = setInterval(() => {
-        const remaining = calculateRemaining(order.start_time!, totalDurationSeconds)
-        
-        setRemainingSeconds(remaining)
-        
-        if (remaining <= 0) {
-          if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
-          setTrackerRunning(false)
-        }
-      }, 1000)
-    } else {
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
-    }
-    
-    return () => {
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
-    }
-  }, [trackerRunning, order?.start_time, totalDurationSeconds, calculateRemaining])
-
   useEffect(() => {
     fetchOrder()
   }, [id])
 
   const handleRefresh = useCallback(async () => {
-    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
     await fetchOrder()
   }, [])
 
@@ -170,33 +127,6 @@ export default function CleanerOrderDetail() {
 
       setOrder(data)
       setClientGiven(data.price)
-      
-      // КОНВЕРТИРУЕМ ОДИН РАЗ: duration из БД в секунды
-      const durationMinutes = parseInt(data.duration || '60')  // 240
-      const durationSeconds = durationMinutes * 60              // 14400 секунд
-      setTotalDurationSeconds(durationSeconds)
-      
-      if (data.status === 'in_progress' && data.start_time && !data.end_time) {
-        // Активная уборка — расчёт от start_time через единую функцию
-        const remaining = calculateRemaining(data.start_time, durationSeconds)
-        
-        setRemainingSeconds(remaining)
-        
-        if (remaining <= 0) {
-          setTrackerRunning(false)
-        } else {
-          setTrackerRunning(true)
-        }
-      } else if (data.status === 'done') {
-        setRemainingSeconds(0)
-        setTrackerRunning(false)
-      } else {
-        // Новый заказ — полное время
-        setRemainingSeconds(durationSeconds)
-        setTrackerRunning(false)
-      }
-      
-      setIsInitialized(true)
     } catch (err) {
       setError(errorsT('loadError'))
     } finally {
@@ -229,69 +159,20 @@ export default function CleanerOrderDetail() {
     setUpdating(false)
   }
 
-  const handleStartTimer = async () => {
+  const handleCompleteCleaning = async () => {
     if (!order) return
     
-    const now = new Date()
-    const nowISO = now.toISOString()
-    
-    const { error } = await supabase
-      .from('orders')
-      .update({ 
-        start_time: nowISO, 
-        status: 'in_progress' 
-      })
-      .eq('id', id)
-    
-    if (!error) {
-      setRemainingSeconds(totalDurationSeconds)
-      setTrackerRunning(true)
-      setOrder(prev => prev ? {...prev, status: 'in_progress', start_time: nowISO} : null)
-    }
-  }
-
-  const handlePauseTimer = async () => {
-    if (!trackerRunning) return
-    
-    // Сохраняем промежуточное время в БД
-    const elapsedSeconds = totalDurationSeconds - remainingSeconds
-    const totalMinutes = Math.floor(elapsedSeconds / 60)
-    
-    await supabase
-      .from('orders')
-      .update({ total_minutes: totalMinutes })
-      .eq('id', id)
-    
-    setTrackerRunning(false)
-  }
-
-  const handleResumeTimer = () => {
-    if (trackerRunning) return
-    setTrackerRunning(true)
-  }
-
-  const handleStopTimer = async () => {
-    if (!order) return
-    setTrackerRunning(false)
-    
-    const elapsedSeconds = totalDurationSeconds - remainingSeconds
-    const totalMinutes = Math.max(1, Math.floor(elapsedSeconds / 60))
     const nowISO = new Date().toISOString()
     
     const { error } = await supabase
       .from('orders')
       .update({ 
-        end_time: nowISO, 
-        total_minutes: totalMinutes
+        end_time: nowISO
       })
       .eq('id', id)
     
     if (!error) {
-      setOrder(prev => prev ? {
-        ...prev,
-        end_time: nowISO,
-        total_minutes: totalMinutes
-      } : null)
+      setOrder(prev => prev ? { ...prev, end_time: nowISO } : null)
       setShowPaymentForm(true)
     }
   }
@@ -347,25 +228,21 @@ export default function CleanerOrderDetail() {
           hoverGradient: 'from-yellow-600 to-amber-600',
           icon: ClockIcon 
         }
+      case 'in_progress':
+        return { 
+          label: ordersT('complete'), 
+          status: null,
+          bgGradient: 'from-red-600 to-red-500',
+          hoverGradient: 'from-red-700 to-red-600',
+          icon: CheckCircle,
+          isComplete: true
+        }
       default:
         return null
     }
   }
 
   const nextAction = getNextAction()
-
-  const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
-    const secs = seconds % 60
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-  }
-
-  const getProgressPercent = () => {
-    if (totalDurationSeconds === 0) return 0
-    const elapsed = totalDurationSeconds - remainingSeconds
-    return Math.min(100, Math.max(0, (elapsed / totalDurationSeconds) * 100))
-  }
 
   if (loading) {
     return (
@@ -398,10 +275,6 @@ export default function CleanerOrderDetail() {
   }
 
   const change = Math.max(0, clientGiven - order.price)
-  const isInProgress = order.status === 'in_progress'
-  const hasStarted = order.start_time !== null && order.end_time === null
-  const progressPercent = getProgressPercent()
-  const timeExpired = remainingSeconds <= 0 && isInitialized
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -508,14 +381,6 @@ export default function CleanerOrderDetail() {
                 </span>
               </div>
             )}
-            {order.total_minutes && order.total_minutes > 0 && (
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500">{ordersT('cleaningTime')}</span>
-                <span className="font-medium text-gray-900 dark:text-white">
-                  {Math.floor(order.total_minutes / 60)}ч {(order.total_minutes % 60)}мин
-                </span>
-              </div>
-            )}
             {order.comment && (
               <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-950/20 rounded-xl">
                 <p className="text-xs text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-2">{ordersT('comment')}</p>
@@ -526,100 +391,16 @@ export default function CleanerOrderDetail() {
         </div>
       </div>
 
-      {/* Таймер для заказов в процессе */}
-      {isInProgress && !timeExpired && (
-        <div className="mb-8 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30 rounded-2xl p-6 border border-blue-200 dark:border-blue-800">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-4">
-              <div className="h-14 w-14 rounded-full bg-blue-500/20 flex items-center justify-center">
-                <ClockIcon size={28} className="text-blue-600 dark:text-blue-400" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm text-gray-600 dark:text-gray-400">{t('timer')}</p>
-                <p className="text-3xl font-mono font-bold text-gray-900 dark:text-white">
-                  {formatTime(remainingSeconds)}
-                </p>
-              </div>
-            </div>
-            
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div 
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-            
-            <div className="flex justify-center gap-3">
-              {!hasStarted ? (
-                <button
-                  onClick={handleStartTimer}
-                  className="flex items-center gap-2 px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-all duration-200 shadow-md"
-                >
-                  <Play size={18} />
-                  {t('startCleaning')}
-                </button>
-              ) : (
-                <>
-                  {trackerRunning ? (
-                    <button
-                      onClick={handlePauseTimer}
-                      className="flex items-center gap-2 px-8 py-3 bg-yellow-600 hover:bg-yellow-700 text-white rounded-xl font-medium transition-all duration-200 shadow-md"
-                    >
-                      <Pause size={18} />
-                      {t('pause')}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleResumeTimer}
-                      className="flex items-center gap-2 px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium transition-all duration-200 shadow-md"
-                    >
-                      <Play size={18} />
-                      {t('resume')}
-                    </button>
-                  )}
-                  <button
-                    onClick={handleStopTimer}
-                    className="flex items-center gap-2 px-8 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium transition-all duration-200 shadow-md"
-                  >
-                    <Square size={18} />
-                    {t('complete')}
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Время вышло */}
-      {isInProgress && timeExpired && (
-        <div className="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 rounded-2xl p-6 border border-green-200 dark:border-green-800">
-          <div className="flex flex-col items-center text-center gap-3">
-            <div className="h-16 w-16 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
-              <CheckCircle size={34} className="text-green-600 dark:text-green-400" />
-            </div>
-            <div>
-              <p className="text-lg font-medium text-green-700 dark:text-green-300">
-                {ordersT('cleaningExpired')}
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                {ordersT('waitingAdminCompletion')}
-              </p>
-            </div>
-            <button
-              onClick={() => setShowPaymentForm(true)}
-              className="mt-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium transition-all"
-            >
-              {paymentsT('title')}
-            </button>
-          </div>
-        </div>
-      )}
-
       {nextAction && !showPaymentForm && (
         <div className="mb-8">
           <button
-            onClick={() => updateStatus(nextAction.status)}
+            onClick={() => {
+              if (nextAction.isComplete) {
+                handleCompleteCleaning()
+              } else {
+                updateStatus(nextAction.status!)
+              }
+            }}
             disabled={updating}
             className={`w-full py-4 bg-gradient-to-r ${nextAction.bgGradient} hover:${nextAction.hoverGradient} disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all duration-200 transform active:scale-[0.98] shadow-md flex items-center justify-center gap-2 text-lg`}
           >
@@ -658,11 +439,6 @@ export default function CleanerOrderDetail() {
               <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-xl p-4 text-center">
                 <p className="text-sm text-gray-600 dark:text-gray-400">{ordersT('price')}</p>
                 <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{order.price} zł</p>
-                {order.total_minutes && order.total_minutes > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    {ordersT('cleaningTime')}: {Math.floor(order.total_minutes / 60)}ч {(order.total_minutes % 60)}мин
-                  </p>
-                )}
               </div>
 
               <div>
