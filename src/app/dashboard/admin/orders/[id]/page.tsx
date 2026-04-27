@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useParams, useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import OrderChat from '@/components/OrderChat'
-import { Calendar, MapPin, Phone, DollarSign, ExternalLink, ArrowLeft, Clock, User, Edit3, Save, X, CheckCircle, Clock as ClockIcon, Sparkles, XCircle, ChevronDown, Play, Timer } from 'lucide-react'
+import { Calendar, MapPin, Phone, DollarSign, ExternalLink, ArrowLeft, Clock, User, Edit3, Save, X, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 
 type Order = {
@@ -31,7 +31,6 @@ export default function AdminOrderDetail() {
   const t = useTranslations('common')
   const ordersT = useTranslations('orders')
   const cleanersT = useTranslations('cleaners')
-  const errorsT = useTranslations('errors')
   const settingsT = useTranslations('settings')
   const notificationsT = useTranslations('notifications')
   
@@ -48,76 +47,8 @@ export default function AdminOrderDetail() {
     planned_time: '',
   })
   
-  // Для таймера (обратный отсчёт)
-  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null)
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  
   const router = useRouter()
   const supabase = createClient()
-
-  // ЕДИНАЯ ФОРМУЛА РАСЧЁТА ОСТАВШЕГОСЯ ВРЕМЕНИ (синхронизирована с клинером)
-  const calculateRemainingSeconds = useCallback((startTime: string, durationMinutes: number): number => {
-    const startMs = new Date(startTime).getTime()
-    const durationMs = durationMinutes * 60 * 1000
-    const endMs = startMs + durationMs
-    return Math.max(0, Math.ceil((endMs - Date.now()) / 1000))
-  }, [])
-
-  // Запуск таймера для активного заказа (синхронизирован с клинером)
-  const startTimer = useCallback(() => {
-    if (!order?.start_time || !order?.duration) return
-
-    // Очищаем предыдущий интервал
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current)
-    }
-
-    const updateTimer = () => {
-      const remaining = calculateRemainingSeconds(order.start_time!, order.duration!)
-      
-      setRemainingSeconds(remaining)
-
-      // Если время вышло, останавливаем таймер (но не меняем статус — это делает админ вручную)
-      if (remaining <= 0) {
-        if (timerIntervalRef.current) {
-          clearInterval(timerIntervalRef.current)
-          timerIntervalRef.current = null
-        }
-        fetchOrder() // Обновляем заказ, чтобы получить актуальные данные
-      }
-    }
-
-    updateTimer() // Немедленное обновление
-    timerIntervalRef.current = setInterval(updateTimer, 1000)
-  }, [order?.start_time, order?.duration, calculateRemainingSeconds])
-
-  // Форматирование секунд в ЧЧ:ММ:СС (единый формат для всех)
-  const formatSeconds = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
-    const secs = seconds % 60
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-  }
-
-  const formatDuration = (minutes?: number) => {
-    if (!minutes && minutes !== 0) return ''
-    if (minutes >= 60) {
-      const hours = Math.floor(minutes / 60)
-      const remainder = minutes % 60
-      if (remainder === 0) return `${hours} ${t('hours')}`
-      return `${hours}ч ${remainder}мин`
-    }
-    return `${minutes} ${t('minutes')}`
-  }
-
-  // Прогресс в процентах (единый расчёт)
-  const getProgressPercent = () => {
-    if (!order?.start_time || !order?.duration || remainingSeconds === null) return 0
-    
-    const totalSeconds = order.duration * 60
-    const elapsed = totalSeconds - remainingSeconds
-    return Math.min(100, Math.max(0, Math.round((elapsed / totalSeconds) * 100)))
-  }
 
   const statusLabels: Record<string, string> = {
     new: ordersT('status.new'),
@@ -135,24 +66,15 @@ export default function AdminOrderDetail() {
     cancelled: 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300',
   }
 
-  const statusIcons: Record<string, string> = {
-    new: '🆕',
-    accepted: '✅',
-    in_progress: '🔄',
-    done: '✔️',
-    cancelled: '❌',
-  }
-
   const allStatuses = [
-    { value: 'new', label: ordersT('status.new'), icon: '🆕', color: 'blue' },
-    { value: 'accepted', label: ordersT('status.accepted'), icon: '✅', color: 'emerald' },
-    { value: 'in_progress', label: ordersT('status.in_progress'), icon: '🔄', color: 'amber' },
-    { value: 'done', label: ordersT('status.done'), icon: '✔️', color: 'green' },
-    { value: 'cancelled', label: ordersT('status.cancelled'), icon: '❌', color: 'red' },
+    { value: 'new', label: ordersT('status.new'), icon: '🆕' },
+    { value: 'accepted', label: ordersT('status.accepted'), icon: '✅' },
+    { value: 'in_progress', label: ordersT('status.in_progress'), icon: '🔄' },
+    { value: 'done', label: ordersT('status.done'), icon: '✔️' },
+    { value: 'cancelled', label: ordersT('status.cancelled'), icon: '❌' },
   ]
 
   async function fetchOrder() {
-    // Проверка сессии и роли
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
       router.push('/login')
@@ -261,15 +183,9 @@ export default function AdminOrderDetail() {
   useEffect(() => {
     fetchOrder()
     fetchCleaners()
-    
-    return () => {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current)
-      }
-    }
   }, [id])
 
-  // Подписка на реальные изменения заказа в реальном времени
+  // Подписка на изменения заказа
   useEffect(() => {
     const channel = supabase
       .channel(`order_${id}`)
@@ -303,19 +219,6 @@ export default function AdminOrderDetail() {
     }
   }, [id, supabase])
 
-  // Запуск/остановка таймера при изменении заказа
-  useEffect(() => {
-    if (order && order.status === 'in_progress' && order.start_time && !order.end_time && order.duration) {
-      startTimer()
-    } else {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current)
-        timerIntervalRef.current = null
-      }
-      setRemainingSeconds(null)
-    }
-  }, [order?.status, order?.start_time, order?.end_time, order?.duration, startTimer])
-
   useEffect(() => {
     if (order) {
       setSelectedStatus(order.status)
@@ -330,14 +233,10 @@ export default function AdminOrderDetail() {
     </div>
   )
 
-  const isInProgress = order.status === 'in_progress'
-  const progressPercent = getProgressPercent()
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
         
-        {/* Header с навигацией */}
         <div className="mb-8">
           <Link 
             href="/dashboard/admin/orders"
@@ -362,7 +261,6 @@ export default function AdminOrderDetail() {
               </p>
             </div>
             
-            {/* Выпадающий список для изменения статуса */}
             <div className="relative">
               <select
                 value={selectedStatus}
@@ -381,65 +279,7 @@ export default function AdminOrderDetail() {
           </div>
         </div>
 
-        {/* Таймер — показываем только для заказов в процессе */}
-        {isInProgress && remainingSeconds !== null && remainingSeconds > 0 && (
-          <div className="mb-6 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 rounded-2xl p-6 border border-amber-200 dark:border-amber-800">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-amber-100 dark:bg-amber-900/50 rounded-xl">
-                  <Timer size={28} className="text-amber-600 dark:text-amber-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">{ordersT('cleaningInProgress')}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{ordersT('remaining')}</p>
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="font-mono text-4xl md:text-5xl font-bold text-amber-700 dark:text-amber-300">
-                  {formatSeconds(remainingSeconds)}
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  {ordersT('plannedDuration')}: <span className="font-medium">{formatDuration(order.duration)}</span>
-                </p>
-              </div>
-            </div>
-            {/* Прогресс-бар */}
-            <div className="mt-4">
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div 
-                  className="bg-amber-500 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-              <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-2">
-                {ordersT('completed')} {progressPercent}%
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Если таймер закончился, показываем сообщение */}
-        {isInProgress && remainingSeconds !== null && remainingSeconds === 0 && (
-          <div className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 rounded-2xl p-6 border border-green-200 dark:border-green-800">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-green-100 dark:bg-green-900/50 rounded-xl">
-                  <CheckCircle size={28} className="text-green-600 dark:text-green-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-green-600 dark:text-green-400 font-medium">{ordersT('cleaningExpired')}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{ordersT('timeElapsed')}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Основная информация */}
         <div className="grid lg:grid-cols-2 gap-6 mb-8">
-          {/* Данные клиента */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
               <h2 className="font-semibold text-lg flex items-center gap-2">
@@ -480,7 +320,6 @@ export default function AdminOrderDetail() {
             </div>
           </div>
 
-          {/* Детали заказа */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
               <h2 className="font-semibold text-lg flex items-center gap-2">
@@ -506,26 +345,6 @@ export default function AdminOrderDetail() {
                         {order.planned_time.slice(0, 5)}
                       </>
                     )}
-                  </span>
-                </div>
-              )}
-              
-              {order.status === 'done' && order.total_minutes && order.total_minutes > 0 && (
-                <div className="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
-                  <span className="text-gray-500 dark:text-gray-400">{ordersT('actualTime')}</span>
-                  <span className="font-medium flex items-center gap-2 text-green-600 dark:text-green-400">
-                    <CheckCircle size={16} />
-                    {formatDuration(order.total_minutes)}
-                  </span>
-                </div>
-              )}
-              
-              {order.duration && order.status !== 'done' && order.status !== 'in_progress' && (
-                <div className="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
-                  <span className="text-gray-500 dark:text-gray-400">{ordersT('plannedDuration')}</span>
-                  <span className="font-medium flex items-center gap-2">
-                    <Clock size={16} className="text-gray-400" />
-                    {formatDuration(order.duration)}
                   </span>
                 </div>
               )}
@@ -558,9 +377,7 @@ export default function AdminOrderDetail() {
           </div>
         </div>
 
-        {/* Редактирование и чат */}
         <div className="grid lg:grid-cols-2 gap-6">
-          {/* Редактирование заказа */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800 flex justify-between items-center">
               <h2 className="font-semibold text-lg flex items-center gap-2">
@@ -684,11 +501,9 @@ export default function AdminOrderDetail() {
             </div>
           </div>
 
-          {/* Чат */}
           <OrderChat orderId={id} isAdmin={true} />
         </div>
 
-        {/* Footer Note */}
         <div className="mt-12 text-center text-xs text-gray-400 dark:text-gray-600">
           <p>© 2026 CRM Cleaning Company • {ordersT('details')} #{id.slice(0, 8).toUpperCase()}</p>
         </div>
