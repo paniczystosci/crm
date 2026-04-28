@@ -1,11 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
-import { Calendar, Clock, User, DollarSign, Package, Filter, ChevronRight, Bell, BellDot, Eye, CheckCircle2, Sparkles } from 'lucide-react'
-import { UnreadBadge } from '@/components/UnreadBadge'
+import { Calendar, Clock, User, DollarSign, Package, Filter, ChevronRight, BellDot, Eye, Sparkles } from 'lucide-react'
 
 type Order = {
   id: string
@@ -23,6 +22,12 @@ type Order = {
   profiles?: { full_name: string } | null
 }
 
+type UnreadInfo = {
+  orderId: string
+  count: number
+  lastMessageAt: string
+}
+
 export default function AdminOrders() {
   const t = useTranslations('common')
   const ordersT = useTranslations('orders')
@@ -32,7 +37,7 @@ export default function AdminOrders() {
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
-  const [unreadOrders, setUnreadOrders] = useState<Set<string>>(new Set())
+  const [unreadMap, setUnreadMap] = useState<Map<string, UnreadInfo>>(new Map())
   const [hoveredOrder, setHoveredOrder] = useState<string | null>(null)
 
   const supabase = createClient()
@@ -69,34 +74,35 @@ export default function AdminOrders() {
     getUser()
   }, [])
 
+  // Загрузка заказов
   useEffect(() => {
     fetchOrders()
   }, [filterStatus])
 
+  // Загрузка непрочитанных сообщений (отдельно, не зависит от orders)
   useEffect(() => {
-    if (!userId) return
+    if (userId) {
+      fetchAllUnreadMessages()
+      
+      // Подписка на новые сообщения
+      const channel = supabase
+        .channel('new-messages')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'order_messages',
+          },
+          () => {
+            fetchAllUnreadMessages()
+          }
+        )
+        .subscribe()
 
-    // Подписка на непрочитанные сообщения
-    const channel = supabase
-      .channel('unread-messages')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'order_chat_reads',
-          filter: `user_id=eq.${userId}`,
-        },
-        () => {
-          fetchUnreadMessages()
-        }
-      )
-      .subscribe()
-
-    fetchUnreadMessages()
-
-    return () => {
-      supabase.removeChannel(channel)
+      return () => {
+        supabase.removeChannel(channel)
+      }
     }
   }, [userId])
 
@@ -122,33 +128,66 @@ export default function AdminOrders() {
     setLoading(false)
   }
 
-  async function fetchUnreadMessages() {
+  // Отдельная функция для загрузки непрочитанных сообщений по ВСЕМ заказам
+  async function fetchAllUnreadMessages() {
     if (!userId) return
 
-    const { data: reads } = await supabase
-      .from('order_chat_reads')
-      .select('order_id, last_read_at')
-      .eq('user_id', userId)
+    try {
+      // 1. Получаем все заказы пользователя (или все, если админ)
+      const { data: allOrders } = await supabase
+        .from('orders')
+        .select('id')
+        .order('created_at', { ascending: false })
 
-    const readMap = new Map(
-      reads?.map(r => [r.order_id, new Date(r.last_read_at)]) || []
-    )
+      if (!allOrders || allOrders.length === 0) return
 
-    const { data: messages } = await supabase
-      .from('order_messages')
-      .select('order_id, created_at')
-      .in('order_id', orders.map(o => o.id))
-      .order('created_at', { ascending: false })
+      const orderIds = allOrders.map(o => o.id)
 
-    const unread = new Set<string>()
-    messages?.forEach(msg => {
-      const lastRead = readMap.get(msg.order_id)
-      if (!lastRead || new Date(msg.created_at) > lastRead) {
-        unread.add(msg.order_id)
-      }
-    })
+      // 2. Получаем последние прочтения пользователя
+      const { data: reads } = await supabase
+        .from('order_chat_reads')
+        .select('order_id, last_read_at')
+        .eq('user_id', userId)
 
-    setUnreadOrders(unread)
+      const readMap = new Map(
+        reads?.map(r => [r.order_id, new Date(r.last_read_at)]) || []
+      )
+
+      // 3. Получаем последние сообщения по каждому заказу
+      const { data: messages } = await supabase
+        .from('order_messages')
+        .select('order_id, created_at')
+        .in('order_id', orderIds)
+        .order('created_at', { ascending: false })
+
+      // 4. Считаем непрочитанные
+      const unread = new Map<string, UnreadInfo>()
+      
+      messages?.forEach(msg => {
+        const lastRead = readMap.get(msg.order_id)
+        const msgDate = new Date(msg.created_at)
+        
+        if (!lastRead || msgDate > lastRead) {
+          const existing = unread.get(msg.order_id)
+          if (!existing) {
+            unread.set(msg.order_id, {
+              orderId: msg.order_id,
+              count: 1,
+              lastMessageAt: msg.created_at
+            })
+          } else {
+            unread.set(msg.order_id, {
+              ...existing,
+              count: existing.count + 1
+            })
+          }
+        }
+      })
+
+      setUnreadMap(unread)
+    } catch (error) {
+      console.error('Error fetching unread messages:', error)
+    }
   }
 
   const getStatusCount = (status: string) => {
@@ -156,14 +195,20 @@ export default function AdminOrders() {
     return orders.filter(o => o.status === status).length
   }
 
-  const formatDuration = (minutes?: number) => {
-    if (minutes == null) return ''
-    if (minutes >= 60) {
-      const h = Math.floor(minutes / 60)
-      const m = minutes % 60
-      return m === 0 ? `${h} ${t('hours')}` : `${h}ч ${m}мин`
-    }
-    return `${minutes} ${t('minutes')}`
+  // Функция для форматирования времени последнего сообщения
+  const getLastMessageTime = (lastMessageAt?: string) => {
+    if (!lastMessageAt) return ''
+    const date = new Date(lastMessageAt)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'только что'
+    if (diffMins < 60) return `${diffMins} мин назад`
+    if (diffHours < 24) return `${diffHours} ч назад`
+    return `${diffDays} д назад`
   }
 
   return (
@@ -198,15 +243,17 @@ export default function AdminOrders() {
                 </div>
                 <div className="text-xs text-gray-500">{ordersT('active')}</div>
               </div>
-              {unreadOrders.size > 0 && (
-                <div className="text-center">
+              {unreadMap.size > 0 && (
+                <>
                   <div className="w-px h-8 bg-gray-200 dark:bg-gray-700 mx-3"></div>
-                  <div className="flex items-center gap-1">
-                    <BellDot size={18} className="text-amber-500" />
-                    <div className="text-2xl font-bold text-amber-600">{unreadOrders.size}</div>
+                  <div className="text-center">
+                    <div className="flex items-center gap-1">
+                      <BellDot size={18} className="text-amber-500" />
+                      <div className="text-2xl font-bold text-amber-600">{unreadMap.size}</div>
+                    </div>
+                    <div className="text-xs text-gray-500">с непрочитанными</div>
                   </div>
-                  <div className="text-xs text-gray-500">{notificationsT('newMessage')}</div>
-                </div>
+                </>
               )}
             </div>
           </div>
@@ -264,7 +311,8 @@ export default function AdminOrders() {
         ) : (
           <div className="space-y-4">
             {orders.map((order, idx) => {
-              const hasUnread = unreadOrders.has(order.id)
+              const unreadInfo = unreadMap.get(order.id)
+              const hasUnread = !!unreadInfo
               const isHovered = hoveredOrder === order.id
               
               return (
@@ -284,17 +332,17 @@ export default function AdminOrders() {
                     }
                     hover:shadow-xl hover:-translate-y-0.5
                   `}>
-                    {/* Уведомление badge */}
+                    {/* Уведомление badge - более заметный */}
                     {hasUnread && (
-                      <div className="absolute -top-2 -right-2 z-10 animate-bounce">
+                      <div className="absolute -top-3 -right-3 z-10">
                         <div className="relative">
-                          <div className="absolute inset-0 animate-ping rounded-full bg-amber-400 opacity-60"></div>
-                          <div className="relative flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full shadow-lg">
-                            <BellDot size={14} className="text-white" />
-                            <span className="text-xs font-semibold text-white">
-                              {notificationsT('newMessage')}
+                          <div className="absolute inset-0 animate-ping rounded-full bg-red-400 opacity-60"></div>
+                          <div className="relative flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-red-500 to-amber-500 rounded-full shadow-lg">
+                            <BellDot size={14} className="text-white animate-bounce" />
+                            <span className="text-xs font-bold text-white">
+                              {unreadInfo.count} {unreadInfo.count === 1 ? 'новое сообщение' : 'новых сообщений'}
                             </span>
-                            <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></span>
                           </div>
                         </div>
                       </div>
@@ -310,9 +358,9 @@ export default function AdminOrders() {
                             </span>
                             <span className="text-xs text-gray-400 font-mono">#{order.id.slice(0, 8)}</span>
                             {hasUnread && (
-                              <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 animate-pulse">
+                              <span className="inline-flex items-center gap-1 text-xs text-red-500 dark:text-red-400 animate-pulse font-medium">
                                 <Sparkles size={12} />
-                                <span>New activity</span>
+                                <span>Новое сообщение</span>
                               </span>
                             )}
                           </div>
@@ -320,12 +368,12 @@ export default function AdminOrders() {
                           <h3 className={`
                             font-bold text-xl mb-2 line-clamp-1 transition-colors
                             ${hasUnread 
-                              ? 'text-amber-700 dark:text-amber-400' 
+                              ? 'text-red-600 dark:text-red-400' 
                               : 'text-gray-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400'
                             }
                           `}>
                             {order.client_name}
-                            {hasUnread && <span className="ml-2 text-amber-500">✨</span>}
+                            {hasUnread && <span className="ml-2 text-red-500">🔴</span>}
                           </h3>
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
@@ -350,6 +398,16 @@ export default function AdminOrders() {
                               <span className="font-semibold text-emerald-600 dark:text-emerald-400">{order.price} zł</span>
                             </div>
                           </div>
+
+                          {/* Информация о последнем сообщении */}
+                          {hasUnread && unreadInfo.lastMessageAt && (
+                            <div className="mt-3 pt-2 border-t border-amber-200 dark:border-amber-800/30">
+                              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                <BellDot size={10} />
+                                Последнее сообщение: {getLastMessageTime(unreadInfo.lastMessageAt)}
+                              </p>
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex items-center justify-between lg:justify-end gap-6 lg:border-l lg:border-gray-200 dark:lg:border-gray-700 lg:pl-6">
@@ -371,12 +429,12 @@ export default function AdminOrders() {
                           <div className={`
                             flex items-center gap-2 font-medium transition-all duration-300
                             ${hasUnread 
-                              ? 'text-amber-600 dark:text-amber-400 gap-3' 
+                              ? 'text-red-600 dark:text-red-400 gap-3' 
                               : 'text-emerald-600 dark:text-emerald-400 group-hover:gap-3'
                             }
                           `}>
                             <span className="text-sm">
-                              {hasUnread ? notificationsT('newMessage') : ordersT('details')}
+                              {hasUnread ? 'Перейти к сообщению' : ordersT('details')}
                             </span>
                             {hasUnread ? (
                               <Eye size={18} className="animate-pulse" />

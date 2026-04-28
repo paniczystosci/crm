@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useParams, useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import OrderChat from '@/components/OrderChat'
+import Link from 'next/link'
 import { 
   Calendar, 
   MapPin, 
@@ -24,13 +25,11 @@ import {
   X,
   MessageCircle,
   BellRing,
-  Shield,
   Zap,
-  Star,
   Award,
-  Send
+  BellDot,
+  Eye
 } from 'lucide-react'
-import Link from 'next/link'
 
 type Order = {
   cleaner_id: any
@@ -51,6 +50,11 @@ type Order = {
   created_at?: string
 }
 
+type UnreadInfo = {
+  count: number
+  lastMessageAt: string
+}
+
 export default function CleanerOrderDetail() {
   const t = useTranslations('common')
   const ordersT = useTranslations('orders')
@@ -66,6 +70,8 @@ export default function CleanerOrderDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [updating, setUpdating] = useState(false)
+  const [unreadInfo, setUnreadInfo] = useState<UnreadInfo | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
 
   const [showPaymentForm, setShowPaymentForm] = useState(false)
   const [paymentType, setPaymentType] = useState<'cash' | 'bank'>('cash')
@@ -121,9 +127,47 @@ export default function CleanerOrderDetail() {
     }
   }
 
+  // Получаем ID пользователя
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUserId(user?.id || null)
+    }
+    getUser()
+  }, [])
+
+  // Загрузка заказа
   useEffect(() => {
     fetchOrder()
   }, [id])
+
+  // Загрузка непрочитанных сообщений для этого заказа
+  useEffect(() => {
+    if (userId && id) {
+      fetchUnreadMessages()
+      
+      // Подписка на новые сообщения
+      const channel = supabase
+        .channel(`unread-${id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'order_messages',
+            filter: `order_id=eq.${id}`,
+          },
+          () => {
+            fetchUnreadMessages()
+          }
+        )
+        .subscribe()
+
+      return () => {
+        supabase.removeChannel(channel)
+      }
+    }
+  }, [userId, id])
 
   async function fetchOrder() {
     setLoading(true)
@@ -156,6 +200,58 @@ export default function CleanerOrderDetail() {
       setError(errorsT('loadError'))
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function fetchUnreadMessages() {
+    if (!userId || !id) return
+
+    try {
+      // Получаем последнее прочтение пользователя
+      const { data: readData } = await supabase
+        .from('order_chat_reads')
+        .select('last_read_at')
+        .eq('order_id', id)
+        .eq('user_id', userId)
+        .single()
+
+      const lastReadAt = readData ? new Date(readData.last_read_at) : null
+
+      // Получаем все сообщения в этом заказе
+      const { data: messages } = await supabase
+        .from('order_messages')
+        .select('created_at')
+        .eq('order_id', id)
+        .order('created_at', { ascending: false })
+
+      if (!messages || messages.length === 0) {
+        setUnreadInfo(null)
+        return
+      }
+
+      // Считаем непрочитанные
+      let unreadCount = 0
+      let lastMessageAt = messages[0].created_at
+
+      for (const msg of messages) {
+        const msgDate = new Date(msg.created_at)
+        if (!lastReadAt || msgDate > lastReadAt) {
+          unreadCount++
+        } else {
+          break
+        }
+      }
+
+      if (unreadCount > 0) {
+        setUnreadInfo({
+          count: unreadCount,
+          lastMessageAt: lastMessageAt
+        })
+      } else {
+        setUnreadInfo(null)
+      }
+    } catch (error) {
+      console.error('Error fetching unread messages:', error)
     }
   }
 
@@ -248,6 +344,22 @@ export default function CleanerOrderDetail() {
   const nextAction = getNextAction()
   const statusMessage = order ? statusMessages[order.status as keyof typeof statusMessages] : null
 
+  // Функция для форматирования времени последнего сообщения
+  const getLastMessageTime = (lastMessageAt?: string) => {
+    if (!lastMessageAt) return ''
+    const date = new Date(lastMessageAt)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'только что'
+    if (diffMins < 60) return `${diffMins} мин назад`
+    if (diffHours < 24) return `${diffHours} ч назад`
+    return `${diffDays} д назад`
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
@@ -268,18 +380,19 @@ export default function CleanerOrderDetail() {
             <AlertCircle size={32} className="text-red-500" />
           </div>
           <p className="text-red-500 mb-6 text-lg">{error || errorsT('notFound')}</p>
-          <button
-            onClick={() => router.push('/dashboard/cleaner')}
-            className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-medium transition-all duration-200 transform hover:scale-105"
+          <Link
+            href="/dashboard/cleaner"
+            className="inline-block px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-medium transition-all duration-200 transform hover:scale-105"
           >
             {ordersT('backToOrders')}
-          </button>
+          </Link>
         </div>
       </div>
     )
   }
 
   const change = Math.max(0, clientGiven - order.price)
+  const hasUnread = !!unreadInfo
 
   return (
     <div className="max-w-5xl mx-auto pb-12">
@@ -302,6 +415,13 @@ export default function CleanerOrderDetail() {
               <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
                 {ordersT('title')} {order.id.slice(0, 8).toUpperCase()}
               </h1>
+              {/* Badge с уведомлениями в шапке */}
+              {hasUnread && (
+                <div className="flex items-center gap-1 px-2 py-1 bg-red-500 text-white rounded-full text-xs animate-pulse">
+                  <BellDot size={12} />
+                  <span>{unreadInfo.count} новых</span>
+                </div>
+              )}
             </div>
             <p className="text-gray-500 dark:text-gray-400 ml-13">
               {ordersT('client')}: <span className="font-medium text-gray-700 dark:text-gray-300">{order.client_name}</span>
@@ -314,6 +434,25 @@ export default function CleanerOrderDetail() {
           </div>
         </div>
       </div>
+
+      {/* Баннер с уведомлением о непрочитанных сообщениях */}
+      {hasUnread && order.status !== 'done' && (
+        <div className="mb-6 bg-gradient-to-r from-red-500 to-amber-500 rounded-xl p-4 text-white shadow-lg animate-in slide-in-from-top-4 duration-500">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center animate-bounce">
+              <BellDot size={20} className="text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold">📬 Новые сообщения в чате</p>
+              <p className="text-sm text-white/90">
+                У вас {unreadInfo.count} {unreadInfo.count === 1 ? 'непрочитанное сообщение' : 'непрочитанных сообщений'}
+                {unreadInfo.lastMessageAt && ` (${getLastMessageTime(unreadInfo.lastMessageAt)})`}
+              </p>
+            </div>
+            <Eye size={20} className="text-white animate-pulse" />
+          </div>
+        </div>
+      )}
 
       {/* Status Message Banner */}
       {statusMessage && order.status !== 'done' && (
@@ -330,94 +469,89 @@ export default function CleanerOrderDetail() {
         </div>
       )}
 
-      {/* Main Info Grid */}
-      <div className="grid md:grid-cols-2 gap-6 mb-8">
-        {/* Client Info */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-2xl transition-all duration-300">
-          <div className="p-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
-            <h2 className="font-semibold text-lg flex items-center gap-2">
-              <User size={20} className="text-emerald-500" />
-              {ordersT('client')}
-            </h2>
-          </div>
-          <div className="p-5 space-y-4">
-            <div className="flex items-start gap-3 group">
-              <Phone size={18} className="text-gray-400 mt-0.5 group-hover:text-emerald-500 transition-colors" />
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">{ordersT('phone')}</p>
-                <p className="font-medium text-gray-900 dark:text-white mt-0.5">{order.client_phone}</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3 group">
-              <MapPin size={18} className="text-gray-400 mt-0.5 group-hover:text-emerald-500 transition-colors" />
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">{ordersT('address')}</p>
-                <p className="font-medium text-gray-900 dark:text-white mt-0.5">{order.address}</p>
-                {order.google_maps_link && (
-                  <a 
-                    href={order.google_maps_link} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 text-sm mt-2 transition-all hover:gap-2"
-                  >
-                    <ExternalLink size={14} />
-                    {t('openInMaps')}
-                  </a>
+      {/* Main Info Grid - теперь полностью кликабельно */}
+      <Link href={`/dashboard/cleaner/orders/${order.id}`} className="block">
+        <div className="grid md:grid-cols-2 gap-6 mb-8">
+          {/* Client Info */}
+          <div className={`bg-white dark:bg-gray-800 rounded-2xl shadow-xl border transition-all duration-300 hover:shadow-2xl hover:-translate-y-0.5 cursor-pointer
+            ${hasUnread 
+              ? 'border-red-300 dark:border-red-700 shadow-red-100 dark:shadow-red-950/20' 
+              : 'border-gray-200 dark:border-gray-700'
+            }`}>
+            <div className="p-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
+              <h2 className="font-semibold text-lg flex items-center gap-2">
+                <User size={20} className="text-emerald-500" />
+                {ordersT('client')}
+                {hasUnread && (
+                  <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full animate-pulse">
+                    {unreadInfo.count}
+                  </span>
                 )}
+              </h2>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="flex items-start gap-3 group">
+                <Phone size={18} className="text-gray-400 mt-0.5 group-hover:text-emerald-500 transition-colors" />
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider">{ordersT('phone')}</p>
+                  <p className="font-medium text-gray-900 dark:text-white mt-0.5">{order.client_phone}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 group">
+                <MapPin size={18} className="text-gray-400 mt-0.5 group-hover:text-emerald-500 transition-colors" />
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider">{ordersT('address')}</p>
+                  <p className="font-medium text-gray-900 dark:text-white mt-0.5">{order.address}</p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Order Details */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-2xl transition-all duration-300">
-          <div className="p-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
-            <h2 className="font-semibold text-lg flex items-center gap-2">
-              <DollarSign size={20} className="text-emerald-500" />
-              {ordersT('details')}
-            </h2>
-          </div>
-          <div className="p-5 space-y-4">
-            <div className="flex justify-between items-center pb-3 border-b border-gray-100 dark:border-gray-700">
-              <span className="text-gray-500">{ordersT('price')}</span>
-              <span className="font-bold text-2xl text-emerald-600 dark:text-emerald-400">{order.price} zł</span>
+          {/* Order Details */}
+          <div className={`bg-white dark:bg-gray-800 rounded-2xl shadow-xl border transition-all duration-300 hover:shadow-2xl hover:-translate-y-0.5 cursor-pointer
+            ${hasUnread 
+              ? 'border-red-300 dark:border-red-700 shadow-red-100 dark:shadow-red-950/20' 
+              : 'border-gray-200 dark:border-gray-700'
+            }`}>
+            <div className="p-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
+              <h2 className="font-semibold text-lg flex items-center gap-2">
+                <DollarSign size={20} className="text-emerald-500" />
+                {ordersT('details')}
+              </h2>
             </div>
-            {order.planned_date && (
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500">{ordersT('plannedDate')}</span>
-                <span className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                  <Calendar size={16} className="text-gray-400" />
-                  {new Date(order.planned_date).toLocaleDateString('ru-RU')}
-                  {order.planned_time && (
-                    <>
-                      <Clock size={16} className="text-gray-400 ml-1" />
-                      {order.planned_time.slice(0, 5)}
-                    </>
-                  )}
-                </span>
+            <div className="p-5 space-y-4">
+              <div className="flex justify-between items-center pb-3 border-b border-gray-100 dark:border-gray-700">
+                <span className="text-gray-500">{ordersT('price')}</span>
+                <span className="font-bold text-2xl text-emerald-600 dark:text-emerald-400">{order.price} zł</span>
               </div>
-            )}
-            {order.created_at && (
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500">Создан</span>
-                <span className="font-medium text-gray-500 text-sm flex items-center gap-1">
-                  <Clock size={12} />
-                  {new Date(order.created_at).toLocaleDateString('ru-RU')}
-                </span>
-              </div>
-            )}
-            {order.comment && (
-              <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-800/30">
-                <p className="text-xs text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-2 flex items-center gap-1">
-                  <MessageCircle size={12} />
-                  {ordersT('comment')}
-                </p>
-                <p className="italic text-gray-700 dark:text-gray-300">{order.comment}</p>
-              </div>
-            )}
+              {order.planned_date && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">{ordersT('plannedDate')}</span>
+                  <span className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                    <Calendar size={16} className="text-gray-400" />
+                    {new Date(order.planned_date).toLocaleDateString('ru-RU')}
+                    {order.planned_time && (
+                      <>
+                        <Clock size={16} className="text-gray-400 ml-1" />
+                        {order.planned_time.slice(0, 5)}
+                      </>
+                    )}
+                  </span>
+                </div>
+              )}
+              {order.comment && (
+                <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-800/30">
+                  <p className="text-xs text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                    <MessageCircle size={12} />
+                    {ordersT('comment')}
+                  </p>
+                  <p className="italic text-gray-700 dark:text-gray-300">{order.comment}</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </Link>
 
       {/* Status Action Button */}
       {nextAction && !showPaymentForm && (
@@ -463,7 +597,7 @@ export default function CleanerOrderDetail() {
         </div>
       )}
 
-      {/* Payment Form Modal */}
+      {/* Payment Form Modal (оставляем как есть) */}
       {showPaymentForm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
@@ -481,13 +615,11 @@ export default function CleanerOrderDetail() {
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Order Total */}
               <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-xl p-4 text-center">
                 <p className="text-sm text-gray-600 dark:text-gray-400">{ordersT('price')}</p>
                 <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{order.price} zł</p>
               </div>
 
-              {/* Payment Type */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                   {t('paymentMethod')}
@@ -518,7 +650,6 @@ export default function CleanerOrderDetail() {
                 </div>
               </div>
 
-              {/* Cash Payment Fields */}
               {paymentType === 'cash' && (
                 <div className="space-y-4 animate-in slide-in-from-top-2 duration-200">
                   <div>
@@ -551,7 +682,6 @@ export default function CleanerOrderDetail() {
                 </div>
               )}
 
-              {/* Bank Payment Info */}
               {paymentType === 'bank' && (
                 <div className="bg-blue-50 dark:bg-blue-950/30 rounded-xl p-5 text-center animate-in slide-in-from-top-2 duration-200">
                   <Landmark size={32} className="text-blue-500 mx-auto mb-2" />
@@ -564,7 +694,6 @@ export default function CleanerOrderDetail() {
                 </div>
               )}
 
-              {/* Action Buttons */}
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={handleAcceptPayment}
@@ -585,15 +714,22 @@ export default function CleanerOrderDetail() {
         </div>
       )}
 
-      {/* Chat Section with Animation */}
+      {/* Chat Section with Animation и индикатором уведомлений */}
       <div className="mt-8 animate-in slide-in-from-bottom-6 duration-700">
-        <div className="mb-4 flex items-center gap-2">
-          <div className="h-1 w-8 bg-gradient-to-r from-emerald-500 to-emerald-300 rounded-full"></div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-            <MessageCircle size={18} className="text-emerald-500" />
-            {chatT('title')}
-          </h3>
-          <BellRing size={14} className="text-gray-400" />
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="h-1 w-8 bg-gradient-to-r from-emerald-500 to-emerald-300 rounded-full"></div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <MessageCircle size={18} className="text-emerald-500" />
+              {chatT('title')}
+            </h3>
+          </div>
+          {hasUnread && (
+            <div className="flex items-center gap-1 px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full text-xs">
+              <BellRing size={12} />
+              <span>{unreadInfo.count} новых сообщений</span>
+            </div>
+          )}
         </div>
         <OrderChat orderId={id} isAdmin={false} />
       </div>
@@ -605,3 +741,5 @@ export default function CleanerOrderDetail() {
     </div>
   )
 }
+
+
