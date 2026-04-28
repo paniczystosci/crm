@@ -20,7 +20,8 @@ import {
   Wallet,
   Landmark,
   Coins,
-  X
+  X,
+  Sparkles
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -150,35 +151,58 @@ export default function CleanerOrderDetail() {
       updates.cleaner_id = session.user.id
     }
     
+    // Если переходим в статус in_progress, записываем время начала
+    if (newStatus === 'in_progress' && !order.start_time) {
+      updates.start_time = new Date().toISOString()
+    }
+    
     const { error } = await supabase
       .from('orders')
       .update(updates)
       .eq('id', id)
       
-    if (!error) handleRefresh()
+    if (!error) {
+      await handleRefresh()
+    }
     setUpdating(false)
   }
 
   const handleCompleteCleaning = async () => {
     if (!order) return
     
+    setUpdating(true)
+    
     const nowISO = new Date().toISOString()
     
+    // Обновляем и статус, и время окончания
     const { error } = await supabase
       .from('orders')
       .update({ 
+        status: 'done',
         end_time: nowISO
       })
       .eq('id', id)
     
     if (!error) {
-      setOrder(prev => prev ? { ...prev, end_time: nowISO } : null)
+      // Обновляем локальное состояние
+      setOrder(prev => prev ? { 
+        ...prev, 
+        status: 'done',
+        end_time: nowISO 
+      } : null)
+      // Показываем форму оплаты
       setShowPaymentForm(true)
+    } else {
+      alert(`${errorsT('serverError')}: ${error.message}`)
     }
+    
+    setUpdating(false)
   }
 
   const handleAcceptPayment = async () => {
     if (!order) return
+
+    setUpdating(true)
 
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
@@ -201,6 +225,8 @@ export default function CleanerOrderDetail() {
       })
       .eq('id', id)
 
+    setUpdating(false)
+
     if (error) {
       alert(`${errorsT('serverError')}: ${error.message}`)
     } else {
@@ -211,6 +237,11 @@ export default function CleanerOrderDetail() {
   }
 
   const getNextAction = () => {
+    // Если заказ уже завершен - не показываем кнопки
+    if (order?.status === 'done') {
+      return null
+    }
+    
     switch (order?.status) {
       case 'new':
         return { 
@@ -218,7 +249,8 @@ export default function CleanerOrderDetail() {
           status: 'accepted', 
           bgGradient: 'from-blue-600 to-blue-500',
           hoverGradient: 'from-blue-700 to-blue-600',
-          icon: CheckCircle 
+          icon: CheckCircle,
+          description: 'Принять заказ и приступить к подготовке'
         }
       case 'accepted':
         return { 
@@ -226,7 +258,8 @@ export default function CleanerOrderDetail() {
           status: 'in_progress', 
           bgGradient: 'from-yellow-500 to-amber-500',
           hoverGradient: 'from-yellow-600 to-amber-600',
-          icon: ClockIcon 
+          icon: ClockIcon,
+          description: 'Начать выполнение работ'
         }
       case 'in_progress':
         return { 
@@ -234,8 +267,9 @@ export default function CleanerOrderDetail() {
           status: null,
           bgGradient: 'from-red-600 to-red-500',
           hoverGradient: 'from-red-700 to-red-600',
-          icon: CheckCircle,
-          isComplete: true
+          icon: Sparkles,
+          isComplete: true,
+          description: 'Завершить уборку и принять оплату'
         }
       default:
         return null
@@ -249,6 +283,7 @@ export default function CleanerOrderDetail() {
       <div className="flex flex-col items-center justify-center py-20">
         <div className="relative">
           <div className="animate-spin rounded-full h-12 w-12 border-2 border-emerald-600 border-t-transparent"></div>
+          <div className="absolute inset-0 rounded-full animate-ping border-2 border-emerald-400 opacity-20"></div>
         </div>
         <p className="mt-4 text-gray-500 dark:text-gray-400">{t('loading')}</p>
       </div>
@@ -277,7 +312,7 @@ export default function CleanerOrderDetail() {
   const change = Math.max(0, clientGiven - order.price)
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="max-w-5xl mx-auto pb-12">
       <div className="mb-8">
         <Link 
           href="/dashboard/cleaner"
@@ -308,6 +343,21 @@ export default function CleanerOrderDetail() {
           </div>
         </div>
       </div>
+
+      {/* Поздравление с выполнением заказа */}
+      {order.status === 'done' && (
+        <div className="mb-6 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl p-4 text-white shadow-lg animate-in slide-in-from-top-4 duration-500">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center">
+              <Sparkles size={20} className="text-white" />
+            </div>
+            <div>
+              <p className="font-semibold">🎉 Заказ выполнен!</p>
+              <p className="text-sm text-white/90">Отличная работа! Заказ успешно завершен.</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-2 gap-6 mb-8">
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -381,6 +431,15 @@ export default function CleanerOrderDetail() {
                 </span>
               </div>
             )}
+            {order.start_time && order.end_time && (
+              <div className="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
+                <span className="text-gray-500">Время работы</span>
+                <span className="font-medium text-gray-900 dark:text-white text-sm">
+                  {new Date(order.start_time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })} - 
+                  {new Date(order.end_time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            )}
             {order.comment && (
               <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-950/20 rounded-xl">
                 <p className="text-xs text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-2">{ordersT('comment')}</p>
@@ -391,7 +450,8 @@ export default function CleanerOrderDetail() {
         </div>
       </div>
 
-      {nextAction && !showPaymentForm && (
+      {/* Кнопка действия - не показываем для статуса done */}
+      {nextAction && !showPaymentForm && order.status !== 'done' && (
         <div className="mb-8">
           <button
             onClick={() => {
@@ -402,7 +462,7 @@ export default function CleanerOrderDetail() {
               }
             }}
             disabled={updating}
-            className={`w-full py-4 bg-gradient-to-r ${nextAction.bgGradient} hover:${nextAction.hoverGradient} disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all duration-200 transform active:scale-[0.98] shadow-md flex items-center justify-center gap-2 text-lg`}
+            className={`w-full py-4 bg-gradient-to-r ${nextAction.bgGradient} hover:${nextAction.hoverGradient} disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all duration-200 transform active:scale-[0.98] shadow-md flex items-center justify-center gap-2 text-lg group`}
           >
             {updating ? (
               <>
@@ -411,14 +471,18 @@ export default function CleanerOrderDetail() {
               </>
             ) : (
               <>
-                <nextAction.icon size={20} />
+                <nextAction.icon size={20} className="group-hover:scale-110 transition-transform" />
                 <span>{nextAction.label}</span>
               </>
             )}
           </button>
+          {nextAction.description && (
+            <p className="text-center text-xs text-gray-400 mt-2">{nextAction.description}</p>
+          )}
         </div>
       )}
 
+      {/* Форма оплаты */}
       {showPaymentForm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
@@ -472,7 +536,7 @@ export default function CleanerOrderDetail() {
               </div>
 
               {paymentType === 'cash' && (
-                <div className="space-y-4">
+                <div className="space-y-4 animate-in slide-in-from-top-2 duration-200">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       {t('clientGiven')}
@@ -487,6 +551,7 @@ export default function CleanerOrderDetail() {
                         value={clientGiven}
                         onChange={(e) => setClientGiven(parseFloat(e.target.value) || 0)}
                         className="w-full pl-11 pr-4 py-3 text-xl font-semibold bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:border-emerald-500 transition-all"
+                        autoFocus
                       />
                     </div>
                   </div>
@@ -503,7 +568,7 @@ export default function CleanerOrderDetail() {
               )}
 
               {paymentType === 'bank' && (
-                <div className="bg-blue-50 dark:bg-blue-950/30 rounded-xl p-5 text-center">
+                <div className="bg-blue-50 dark:bg-blue-950/30 rounded-xl p-5 text-center animate-in slide-in-from-top-2 duration-200">
                   <Landmark size={32} className="text-blue-500 mx-auto mb-2" />
                   <p className="text-blue-700 dark:text-blue-300 font-medium">
                     {t('totalAmount')} {order.price} zł
@@ -517,10 +582,17 @@ export default function CleanerOrderDetail() {
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={handleAcceptPayment}
+                  disabled={updating}
                   className="flex-1 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold rounded-xl transition-all duration-200 transform active:scale-[0.98] shadow-md flex items-center justify-center gap-2"
                 >
-                  <CheckCircle size={18} />
-                  {t('acceptPayment')}
+                  {updating ? (
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+                  ) : (
+                    <>
+                      <CheckCircle size={18} />
+                      {t('acceptPayment')}
+                    </>
+                  )}
                 </button>
                 <button
                   onClick={() => setShowPaymentForm(false)}

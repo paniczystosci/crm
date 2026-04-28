@@ -21,7 +21,14 @@ import {
   Wallet,
   Landmark,
   Coins,
-  X
+  X,
+  MessageCircle,
+  BellRing,
+  Shield,
+  Zap,
+  Star,
+  Award,
+  Send
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -41,6 +48,7 @@ type Order = {
   bank_received?: number | null
   change_given?: number | null
   is_incassed?: boolean
+  created_at?: string
 }
 
 export default function CleanerOrderDetail() {
@@ -49,6 +57,7 @@ export default function CleanerOrderDetail() {
   const paymentsT = useTranslations('payments')
   const chatT = useTranslations('chat')
   const errorsT = useTranslations('errors')
+  const notificationsT = useTranslations('notifications')
   
   const { id } = useParams() as { id: string }
   const router = useRouter()
@@ -61,6 +70,7 @@ export default function CleanerOrderDetail() {
   const [showPaymentForm, setShowPaymentForm] = useState(false)
   const [paymentType, setPaymentType] = useState<'cash' | 'bank'>('cash')
   const [clientGiven, setClientGiven] = useState(0)
+  const [hoveredButton, setHoveredButton] = useState<string | null>(null)
 
   const supabase = createClient()
 
@@ -88,6 +98,29 @@ export default function CleanerOrderDetail() {
     cancelled: '❌',
   }
 
+  const statusMessages: Record<string, { title: string; subtitle: string; gradient: string }> = {
+    new: {
+      title: '✨ Новый заказ',
+      subtitle: 'Примите заказ, чтобы начать работу',
+      gradient: 'from-blue-500 to-indigo-500'
+    },
+    accepted: {
+      title: '✅ Заказ принят',
+      subtitle: 'Нажмите "Старт", когда приступите к уборке',
+      gradient: 'from-emerald-500 to-teal-500'
+    },
+    in_progress: {
+      title: '🔄 Работа в процессе',
+      subtitle: 'Завершите уборку и примите оплату',
+      gradient: 'from-amber-500 to-orange-500'
+    },
+    done: {
+      title: '🎉 Заказ выполнен',
+      subtitle: 'Отлично сработано! Заказ завершен',
+      gradient: 'from-green-500 to-emerald-500'
+    }
+  }
+
   useEffect(() => {
     fetchOrder()
   }, [id])
@@ -103,15 +136,6 @@ export default function CleanerOrderDetail() {
         return
       }
 
-      // 🔧 ИЗМЕНЕНИЕ: убираем проверку на cleaner_id для новых заказов
-      // Чтобы клинер мог видеть заказ, даже если он ещё не назначен
-      let query = supabase
-        .from('orders')
-        .select('*')
-        .eq('id', id)
-
-      // Если заказ не новый, проверяем что он назначен этому клинеру
-      // Для новых заказов (status = 'new') пропускаем проверку cleaner_id
       const { data, error } = await supabase
         .from('orders')
         .select('*')
@@ -121,7 +145,6 @@ export default function CleanerOrderDetail() {
       if (error || !data) {
         setError(errorsT('orderNotFound'))
       } else {
-        // Проверяем доступ: если заказ не новый и не назначен этому клинеру - ошибка
         if (data.status !== 'new' && data.cleaner_id !== user.id) {
           setError(errorsT('accessDenied'))
         } else {
@@ -142,7 +165,6 @@ export default function CleanerOrderDetail() {
     
     const { data: { user } } = await supabase.auth.getUser()
     
-    // При принятии заказа - назначаем cleaner_id
     const updates: any = { status: newStatus }
     if (newStatus === 'accepted' && !order.cleaner_id) {
       updates.cleaner_id = user?.id
@@ -194,7 +216,8 @@ export default function CleanerOrderDetail() {
           color: 'blue',
           bgGradient: 'from-blue-600 to-blue-500',
           hoverGradient: 'from-blue-700 to-blue-600',
-          icon: CheckCircle 
+          icon: CheckCircle,
+          description: 'Принять заказ и приступить'
         }
       case 'accepted':
         return { 
@@ -203,7 +226,8 @@ export default function CleanerOrderDetail() {
           color: 'yellow',
           bgGradient: 'from-yellow-500 to-amber-500',
           hoverGradient: 'from-yellow-600 to-amber-600',
-          icon: ClockIcon 
+          icon: ClockIcon,
+          description: 'Начать выполнение работ'
         }
       case 'in_progress':
         return { 
@@ -212,7 +236,8 @@ export default function CleanerOrderDetail() {
           color: 'green',
           bgGradient: 'from-green-600 to-emerald-600',
           hoverGradient: 'from-green-700 to-emerald-700',
-          icon: Sparkles, 
+          icon: Sparkles,
+          description: 'Завершить заказ и принять оплату',
           action: () => setShowPaymentForm(true) 
         }
       default:
@@ -221,12 +246,14 @@ export default function CleanerOrderDetail() {
   }
 
   const nextAction = getNextAction()
+  const statusMessage = order ? statusMessages[order.status as keyof typeof statusMessages] : null
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <div className="relative">
           <div className="animate-spin rounded-full h-12 w-12 border-2 border-emerald-600 border-t-transparent"></div>
+          <div className="absolute inset-0 rounded-full animate-ping border-2 border-emerald-400 opacity-20"></div>
         </div>
         <p className="mt-4 text-gray-500 dark:text-gray-400">{t('loading')}</p>
       </div>
@@ -237,13 +264,13 @@ export default function CleanerOrderDetail() {
     return (
       <div className="max-w-md mx-auto text-center py-12">
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
-          <div className="h-16 w-16 rounded-full bg-red-100 dark:bg-red-950/30 flex items-center justify-center mx-auto mb-4">
+          <div className="h-16 w-16 rounded-full bg-red-100 dark:bg-red-950/30 flex items-center justify-center mx-auto mb-4 animate-pulse">
             <AlertCircle size={32} className="text-red-500" />
           </div>
           <p className="text-red-500 mb-6 text-lg">{error || errorsT('notFound')}</p>
           <button
             onClick={() => router.push('/dashboard/cleaner')}
-            className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-medium transition-all duration-200"
+            className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-medium transition-all duration-200 transform hover:scale-105"
           >
             {ordersT('backToOrders')}
           </button>
@@ -255,7 +282,7 @@ export default function CleanerOrderDetail() {
   const change = Math.max(0, clientGiven - order.price)
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="max-w-5xl mx-auto pb-12">
       {/* Header with back button */}
       <div className="mb-8">
         <Link 
@@ -281,17 +308,32 @@ export default function CleanerOrderDetail() {
             </p>
           </div>
           
-          <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium ${statusColors[order.status]}`}>
+          <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium ${statusColors[order.status]} shadow-sm`}>
             <span>{statusIcons[order.status]}</span>
             <span>{statusLabels[order.status]}</span>
           </div>
         </div>
       </div>
 
+      {/* Status Message Banner */}
+      {statusMessage && order.status !== 'done' && (
+        <div className={`mb-6 bg-gradient-to-r ${statusMessage.gradient} rounded-xl p-4 text-white shadow-lg animate-in slide-in-from-top-4 duration-500`}>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center">
+              <Zap size={20} className="text-white" />
+            </div>
+            <div>
+              <p className="font-semibold">{statusMessage.title}</p>
+              <p className="text-sm text-white/90">{statusMessage.subtitle}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Info Grid */}
       <div className="grid md:grid-cols-2 gap-6 mb-8">
         {/* Client Info */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-2xl transition-all duration-300">
           <div className="p-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
             <h2 className="font-semibold text-lg flex items-center gap-2">
               <User size={20} className="text-emerald-500" />
@@ -299,15 +341,15 @@ export default function CleanerOrderDetail() {
             </h2>
           </div>
           <div className="p-5 space-y-4">
-            <div className="flex items-start gap-3">
-              <Phone size={18} className="text-gray-400 mt-0.5" />
+            <div className="flex items-start gap-3 group">
+              <Phone size={18} className="text-gray-400 mt-0.5 group-hover:text-emerald-500 transition-colors" />
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wider">{ordersT('phone')}</p>
                 <p className="font-medium text-gray-900 dark:text-white mt-0.5">{order.client_phone}</p>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <MapPin size={18} className="text-gray-400 mt-0.5" />
+            <div className="flex items-start gap-3 group">
+              <MapPin size={18} className="text-gray-400 mt-0.5 group-hover:text-emerald-500 transition-colors" />
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wider">{ordersT('address')}</p>
                 <p className="font-medium text-gray-900 dark:text-white mt-0.5">{order.address}</p>
@@ -316,7 +358,7 @@ export default function CleanerOrderDetail() {
                     href={order.google_maps_link} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 text-sm mt-2 transition-colors"
+                    className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 text-sm mt-2 transition-all hover:gap-2"
                   >
                     <ExternalLink size={14} />
                     {t('openInMaps')}
@@ -328,7 +370,7 @@ export default function CleanerOrderDetail() {
         </div>
 
         {/* Order Details */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-2xl transition-all duration-300">
           <div className="p-5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
             <h2 className="font-semibold text-lg flex items-center gap-2">
               <DollarSign size={20} className="text-emerald-500" />
@@ -355,9 +397,21 @@ export default function CleanerOrderDetail() {
                 </span>
               </div>
             )}
+            {order.created_at && (
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500">Создан</span>
+                <span className="font-medium text-gray-500 text-sm flex items-center gap-1">
+                  <Clock size={12} />
+                  {new Date(order.created_at).toLocaleDateString('ru-RU')}
+                </span>
+              </div>
+            )}
             {order.comment && (
-              <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-950/20 rounded-xl">
-                <p className="text-xs text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-2">{ordersT('comment')}</p>
+              <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-800/30">
+                <p className="text-xs text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                  <MessageCircle size={12} />
+                  {ordersT('comment')}
+                </p>
                 <p className="italic text-gray-700 dark:text-gray-300">{order.comment}</p>
               </div>
             )}
@@ -367,11 +421,13 @@ export default function CleanerOrderDetail() {
 
       {/* Status Action Button */}
       {nextAction && !showPaymentForm && (
-        <div className="mb-8">
+        <div className="mb-8 animate-in slide-in-from-bottom-4 duration-500">
           <button
             onClick={nextAction.action || (() => updateStatus(nextAction.status))}
             disabled={updating}
-            className={`w-full py-4 bg-gradient-to-r ${nextAction.bgGradient} hover:${nextAction.hoverGradient} disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all duration-200 transform active:scale-[0.98] shadow-md flex items-center justify-center gap-2 text-lg`}
+            onMouseEnter={() => setHoveredButton('action')}
+            onMouseLeave={() => setHoveredButton(null)}
+            className={`w-full py-4 bg-gradient-to-r ${nextAction.bgGradient} hover:${nextAction.hoverGradient} disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all duration-300 transform active:scale-[0.98] shadow-md flex items-center justify-center gap-2 text-lg group`}
           >
             {updating ? (
               <>
@@ -380,11 +436,30 @@ export default function CleanerOrderDetail() {
               </>
             ) : (
               <>
-                <nextAction.icon size={20} />
+                <nextAction.icon size={20} className={`transition-transform duration-300 ${hoveredButton === 'action' ? 'scale-110' : ''}`} />
                 <span>{nextAction.label}</span>
+                <Sparkles size={16} className="opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </>
             )}
           </button>
+          {nextAction.description && (
+            <p className="text-center text-xs text-gray-400 mt-2">{nextAction.description}</p>
+          )}
+        </div>
+      )}
+
+      {/* Completion Badge for Done Orders */}
+      {order.status === 'done' && (
+        <div className="mb-8 bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-950/30 dark:to-emerald-950/30 rounded-xl p-5 text-center border border-green-200 dark:border-green-800/30 animate-in zoom-in duration-500">
+          <div className="flex items-center justify-center gap-3">
+            <div className="h-12 w-12 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 flex items-center justify-center animate-bounce-subtle">
+              <Award size={24} className="text-white" />
+            </div>
+            <div>
+              <p className="font-bold text-green-700 dark:text-green-400 text-lg">Заказ успешно выполнен!</p>
+              <p className="text-sm text-green-600 dark:text-green-500">Спасибо за качественную работу</p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -422,7 +497,7 @@ export default function CleanerOrderDetail() {
                     onClick={() => setPaymentType('cash')}
                     className={`flex items-center justify-center gap-2 py-3 rounded-xl font-medium transition-all duration-200 ${
                       paymentType === 'cash'
-                        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
+                        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md scale-[1.02]'
                         : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
                   >
@@ -433,7 +508,7 @@ export default function CleanerOrderDetail() {
                     onClick={() => setPaymentType('bank')}
                     className={`flex items-center justify-center gap-2 py-3 rounded-xl font-medium transition-all duration-200 ${
                       paymentType === 'bank'
-                        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
+                        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md scale-[1.02]'
                         : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
                   >
@@ -445,7 +520,7 @@ export default function CleanerOrderDetail() {
 
               {/* Cash Payment Fields */}
               {paymentType === 'cash' && (
-                <div className="space-y-4">
+                <div className="space-y-4 animate-in slide-in-from-top-2 duration-200">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       {t('clientGiven')}
@@ -460,14 +535,15 @@ export default function CleanerOrderDetail() {
                         value={clientGiven}
                         onChange={(e) => setClientGiven(parseFloat(e.target.value) || 0)}
                         className="w-full pl-11 pr-4 py-3 text-xl font-semibold bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:border-emerald-500 transition-all"
+                        autoFocus
                       />
                     </div>
                   </div>
                   
-                  <div className={`p-4 rounded-xl ${change > 0 ? 'bg-amber-50 dark:bg-amber-950/30' : 'bg-green-50 dark:bg-green-950/30'}`}>
+                  <div className={`p-4 rounded-xl transition-all duration-200 ${change > 0 ? 'bg-amber-50 dark:bg-amber-950/30' : 'bg-green-50 dark:bg-green-950/30'}`}>
                     <div className="flex justify-between items-center">
                       <span className="text-gray-600 dark:text-gray-400">{t('change')}:</span>
-                      <span className={`font-bold text-xl ${change > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                      <span className={`font-bold text-xl ${change > 0 ? 'text-amber-600' : 'text-green-600'} ${change > 0 ? 'animate-pulse' : ''}`}>
                         {change.toFixed(2)} zł
                       </span>
                     </div>
@@ -477,7 +553,7 @@ export default function CleanerOrderDetail() {
 
               {/* Bank Payment Info */}
               {paymentType === 'bank' && (
-                <div className="bg-blue-50 dark:bg-blue-950/30 rounded-xl p-5 text-center">
+                <div className="bg-blue-50 dark:bg-blue-950/30 rounded-xl p-5 text-center animate-in slide-in-from-top-2 duration-200">
                   <Landmark size={32} className="text-blue-500 mx-auto mb-2" />
                   <p className="text-blue-700 dark:text-blue-300 font-medium">
                     {t('totalAmount')} {order.price} zł
@@ -492,9 +568,9 @@ export default function CleanerOrderDetail() {
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={handleAcceptPayment}
-                  className="flex-1 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold rounded-xl transition-all duration-200 transform active:scale-[0.98] shadow-md flex items-center justify-center gap-2"
+                  className="flex-1 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold rounded-xl transition-all duration-200 transform active:scale-[0.98] shadow-md flex items-center justify-center gap-2 group"
                 >
-                  <CheckCircle size={18} />
+                  <CheckCircle size={18} className="group-hover:scale-110 transition-transform" />
                   {t('acceptPayment')}
                 </button>
                 <button
@@ -509,8 +585,16 @@ export default function CleanerOrderDetail() {
         </div>
       )}
 
-      {/* Chat Section */}
-      <div className="mt-8">
+      {/* Chat Section with Animation */}
+      <div className="mt-8 animate-in slide-in-from-bottom-6 duration-700">
+        <div className="mb-4 flex items-center gap-2">
+          <div className="h-1 w-8 bg-gradient-to-r from-emerald-500 to-emerald-300 rounded-full"></div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+            <MessageCircle size={18} className="text-emerald-500" />
+            {chatT('title')}
+          </h3>
+          <BellRing size={14} className="text-gray-400" />
+        </div>
         <OrderChat orderId={id} isAdmin={false} />
       </div>
 
