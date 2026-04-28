@@ -59,11 +59,11 @@ export default function AdminOrders() {
   }
 
   const statusIcons: Record<string, string> = {
-    new: '🆕',
-    accepted: '✅',
-    in_progress: '🔄',
-    done: '✔️',
-    cancelled: '❌',
+    new: '',
+    accepted: '',
+    in_progress: '',
+    done: '',
+    cancelled: '',
   }
 
   useEffect(() => {

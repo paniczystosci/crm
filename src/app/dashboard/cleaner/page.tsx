@@ -61,11 +61,11 @@ export default function CleanerOrders() {
   }
 
   const statusIcons: Record<Order['status'], string> = {
-    new: '🆕',
-    accepted: '✅',
-    in_progress: '🔄',
-    done: '✔️',
-    cancelled: '❌',
+    new: '',
+    accepted: '',
+    in_progress: '',
+    done: '',
+    cancelled: '',
   }
 
   useEffect(() => {

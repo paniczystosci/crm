@@ -98,11 +98,11 @@ export default function CleanerOrderDetail() {
   }
 
   const statusIcons: Record<string, string> = {
-    new: '🆕',
-    accepted: '✅',
-    in_progress: '🔄',
-    done: '✔️',
-    cancelled: '❌',
+    new: '',
+    accepted: '',
+    in_progress: '',
+    done: '',
+    cancelled: '',
   }
 
   const statusMessages: Record<string, { title: string; subtitle: string; gradient: string }> = {
