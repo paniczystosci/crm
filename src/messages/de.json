@@ -75,6 +75,8 @@
     "footer": "Alle Rechte vorbehalten."
   },
   "orders": {
+      "endTime": "Endzeit",
+  "startTime": "Startzeit",
     "title": "Aufträge",
     "totalOrders": "Alle Aufträge",
     "today": "Heute",

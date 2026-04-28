@@ -75,6 +75,8 @@
     "footer": "Wszelkie prawa zastrzeżone."
   },
   "orders": {
+      "endTime": "Czas zakończenia",
+  "startTime": "Czas rozpoczęcia",
     "title": "Zamówienia",
     "totalOrders": "Wszystkie zamówienia",
     "today": "Dzisiaj",

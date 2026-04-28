@@ -75,6 +75,8 @@
     "footer": "All rights reserved."
   },
   "orders": {
+      "endTime": "End time",
+  "startTime": "Start time",
     "title": "Orders",
     "totalOrders": "All orders",
     "today": "Today",
