@@ -1,4 +1,3 @@
-// src/app/auth/login/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -20,9 +19,36 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false)
   const [emailFocused, setEmailFocused] = useState(false)
   const [passwordFocused, setPasswordFocused] = useState(false)
+  const [checkingSession, setCheckingSession] = useState(true) // ← новое
   const router = useRouter()
 
   const supabase = createClient()
+
+  // Проверяем сессию при загрузке
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (session) {
+        // Пользователь уже авторизован — получаем роль и редиректим
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single()
+
+        if (profile?.role === 'admin') {
+          router.replace('/dashboard/admin')
+        } else {
+          router.replace('/dashboard/cleaner')
+        }
+      } else {
+        setCheckingSession(false)
+      }
+    }
+    
+    checkSession()
+  }, [])
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -67,8 +93,31 @@ export default function LoginPage() {
         localStorage.setItem('remember_me', 'false')
       }
       
-      router.push('/dashboard')
+      // Получаем роль и редиректим
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', (await supabase.auth.getUser()).data.user?.id)
+        .single()
+
+      if (profile?.role === 'admin') {
+        router.replace('/dashboard/admin')
+      } else {
+        router.replace('/dashboard/cleaner')
+      }
     }
+  }
+
+  // Показываем загрузку, пока проверяем сессию
+  if (checkingSession) {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-2 border-white border-t-transparent mx-auto mb-4"></div>
+          <p className="text-white text-sm">{commonT('loading')}</p>
+        </div>
+      </div>
+    )
   }
 
   return (

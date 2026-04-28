@@ -1,4 +1,3 @@
-// public/sw.js
 const CACHE_NAME = 'crm-v1'
 const STATIC_CACHE = 'static-v1'
 const DYNAMIC_CACHE = 'dynamic-v1'
@@ -11,122 +10,174 @@ const STATIC_ASSETS = [
   '/offline.html'
 ]
 
-// ✅ Только ОДИН обработчик install
-self.addEventListener('install', (event) => {
-  console.log('Service Worker installing...')
+// Функция логирования
+function log(level) {
+  var args = Array.prototype.slice.call(arguments, 1)
+  var prefix = '[SW]'
+  if (level === 'error') {
+    console.error(prefix, args.join(' '))
+  } else if (level === 'warn') {
+    console.warn(prefix, args.join(' '))
+  } else {
+    console.log(prefix, args.join(' '))
+  }
+}
+
+// Проверка: нужно ли кэшировать этот запрос
+function shouldCache(request) {
+  var url = new URL(request.url)
+  
+  if (
+    url.pathname.includes('/api/') ||
+    url.hostname.includes('supabase.co') ||
+    url.hostname.includes('analytics') ||
+    url.pathname.includes('_next/') ||
+    request.method !== 'GET'
+  ) {
+    return false
+  }
+  
+  return url.hostname === self.location.hostname
+}
+
+// Установка
+self.addEventListener('install', function (event) {
+  log('info', 'Installing...')
   event.waitUntil(
-    caches.open(STATIC_CACHE).then(async (cache) => {
-      // Пробуем добавить все ассеты, но не проваливаемся при ошибке
-      await Promise.allSettled(
-        STATIC_ASSETS.map(asset => 
-          cache.add(asset).catch(err => 
-            console.warn(`Failed to cache ${asset}:`, err)
-          )
-        )
+    caches.open(STATIC_CACHE).then(function (cache) {
+      return Promise.allSettled(
+        STATIC_ASSETS.map(function (asset) {
+          return cache.add(asset).catch(function (err) {
+            log('warn', 'Failed to cache ' + asset + ':', err)
+          })
+        })
       )
-      console.log('Static assets cached')
+    }).then(function () {
+      log('info', 'Static assets cached')
     })
   )
   self.skipWaiting()
 })
 
-// ✅ Только ОДИН обработчик activate
-self.addEventListener('activate', (event) => {
-  console.log('Service Worker activating...')
+// Активация
+self.addEventListener('activate', function (event) {
+  log('info', 'Activating...')
   event.waitUntil(
     Promise.all([
-      // Очистка старых кэшей
-      caches.keys().then((keys) => {
+      caches.keys().then(function (keys) {
         return Promise.all(
-          keys.map((key) => {
+          keys.map(function (key) {
             if (key !== STATIC_CACHE && key !== DYNAMIC_CACHE) {
-              console.log('Deleting old cache:', key)
+              log('info', 'Deleting old cache:', key)
               return caches.delete(key)
             }
           })
         )
       }),
-      // Захват контроля
-      clients.claim()
+      self.clients.claim()
     ])
   )
-  console.log('Service Worker activated')
+  log('info', 'Activated')
 })
 
-// ✅ ИСПРАВЛЕННЫЙ обработчик fetch
-self.addEventListener('fetch', (event) => {
-  const { request } = event
+// Fetch
+self.addEventListener('fetch', function (event) {
+  var request = event.request
   
-  // Пропускаем API запросы
-  if (request.url.includes('/api/') || 
-      request.url.includes('supabase.co') ||
-      request.url.includes('analytics') ||
-      request.url.includes('_next/')) { // Добавлено _next
+  if (!shouldCache(request)) {
     return
   }
   
-  // Для HTML страниц используем стратегию "сеть-с-падающим-в-кэш"
+  // Навигация — Network First
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request, { redirect: 'follow' }) // 👈 КЛЮЧЕВОЕ: добавляем redirect
-        .catch(async () => {
-          // Если сеть недоступна, показываем offline.html
-          const cachedOffline = await caches.match('/offline.html')
-          return cachedOffline || new Response('Offline', { status: 503 })
+      fetch(request, { redirect: 'follow' })
+        .catch(function () {
+          return caches.match(request).then(function (cached) {
+            if (cached) return cached
+            return caches.match('/offline.html').then(function (offlinePage) {
+              return offlinePage || new Response('Вы офлайн', {
+                status: 503,
+                headers: { 'Content-Type': 'text/html; charset=utf-8' }
+              })
+            })
+          })
         })
     )
     return
   }
   
-  // Для статических ресурсов используем кэш
+  // Остальные — Cache First + фоновое обновление
   event.respondWith(
-    caches.match(request).then((cachedResponse) => {
+    caches.match(request).then(function (cachedResponse) {
       if (cachedResponse) {
+        // Фоновое обновление
+        fetch(request, { redirect: 'follow' })
+          .then(function (networkResponse) {
+            if (networkResponse.status === 200) {
+              caches.open(DYNAMIC_CACHE).then(function (cache) {
+                cache.put(request, networkResponse.clone())
+              })
+            }
+          })
+          .catch(function () {})
+        
         return cachedResponse
       }
       
-      // Запрос в сеть с правильной обработкой redirect
-      return fetch(request, { redirect: 'follow' }) // 👈 Добавлено везде
-        .then((networkResponse) => {
-          // Кэшируем только успешные GET запросы
-          if (request.method === 'GET' && networkResponse.status === 200) {
-            const responseToCache = networkResponse.clone()
-            caches.open(DYNAMIC_CACHE).then((cache) => {
-              cache.put(request, responseToCache).catch(err => {
-                console.warn('Failed to cache:', request.url, err)
-              })
+      return fetch(request, { redirect: 'follow' })
+        .then(function (networkResponse) {
+          if (networkResponse.status === 200 && request.method === 'GET') {
+            caches.open(DYNAMIC_CACHE).then(function (cache) {
+              cache.put(request, networkResponse.clone()).catch(function () {})
             })
           }
           return networkResponse
         })
-        .catch((error) => {
-          console.warn('Fetch failed:', request.url, error)
-          // Возвращаем заглушку для некритичных ресурсов
+        .catch(function (error) {
+          log('warn', 'Fetch failed:', request.url, error)
+          
           if (request.destination === 'image') {
-            return new Response('Image not available', { status: 404 })
+            return new Response(
+              'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+              {
+                status: 200,
+                headers: { 'Content-Type': 'image/gif' }
+              }
+            )
           }
+          
           return new Response('Network error', { status: 503 })
         })
     })
   )
 })
 
-// ✅ Только ОДИН обработчик push
-self.addEventListener('push', (event) => {
-  console.log('Push notification received')
-  let data = {}
+// Push-уведомления
+self.addEventListener('push', function (event) {
+  log('info', 'Push received')
+  var data = {}
   
   try {
-    data = event.data?.json() || {}
+    if (event.data) {
+      data = event.data.json()
+    }
   } catch (e) {
-    data = { title: 'Новое уведомление', body: 'У вас новое событие' }
+    data = {
+      title: 'CRM Cleaning',
+      body: 'Новое уведомление',
+      url: '/dashboard'
+    }
   }
   
-  const options = {
+  var options = {
     body: data.body || 'У вас новое уведомление',
     icon: '/logo.png',
-    badge: '/icons/icon-72x72.png',
+    badge: '/logo.png',
     vibrate: [200, 100, 200],
+    tag: data.orderId || 'default',
+    renotify: true,
+    requireInteraction: false,
     data: {
       url: data.url || '/dashboard',
       orderId: data.orderId
@@ -134,41 +185,73 @@ self.addEventListener('push', (event) => {
     actions: [
       {
         action: 'open',
-        title: 'Открыть'
+        title: 'Открыть',
+        icon: '/logo.png'
       },
       {
         action: 'close',
-        title: 'Закрыть'
+        title: 'Закрыть',
+        icon: '/logo.png'
       }
     ]
   }
   
   event.waitUntil(
-    self.registration.showNotification(data.title || 'CRM Cleaning', options)
+    self.registration.showNotification(
+      data.title || 'CRM Cleaning',
+      options
+    )
   )
 })
 
-// ✅ Только ОДИН обработчик notificationclick
-self.addEventListener('notificationclick', (event) => {
-  console.log('Notification clicked:', event.action)
+// Клик по уведомлению
+self.addEventListener('notificationclick', function (event) {
+  log('info', 'Notification clicked:', event.action)
   event.notification.close()
   
-  if (event.action === 'open' || !event.action) {
-    const url = event.notification.data?.url || '/dashboard'
+  if (event.action === 'close') return
+  
+  var url = event.notification.data.url || '/dashboard'
+  
+  event.waitUntil(
+    self.clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    }).then(function (windowClients) {
+      for (var i = 0; i < windowClients.length; i++) {
+        var client = windowClients[i]
+        if (client.url.includes(url) && 'focus' in client) {
+          return client.focus()
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(url)
+      }
+    })
+  )
+})
+
+// Сообщения от основного потока
+self.addEventListener('message', function (event) {
+  log('info', 'Message received:', event.data)
+  
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting()
+  }
+  
+  if (event.data && event.data.type === 'CLEAR_CACHE') {
     event.waitUntil(
-      clients.matchAll({ type: 'window', includeUncontrolled: true })
-        .then(windowClients => {
-          // Если есть открытое окно, фокусируем его
-          for (let client of windowClients) {
-            if (client.url === url && 'focus' in client) {
-              return client.focus()
-            }
-          }
-          // Иначе открываем новое
-          if (clients.openWindow) {
-            return clients.openWindow(url)
-          }
+      Promise.all([
+        caches.delete(STATIC_CACHE),
+        caches.delete(DYNAMIC_CACHE)
+      ]).then(function () {
+        log('info', 'All caches cleared')
+        self.clients.matchAll().then(function (clients) {
+          clients.forEach(function (client) {
+            client.postMessage({ type: 'CACHE_CLEARED' })
+          })
         })
+      })
     )
   }
 })

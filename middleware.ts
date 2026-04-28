@@ -1,7 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// Страницы, доступные без авторизации
 const publicPages = [
   '/auth/login',
   '/auth/signup',
@@ -9,23 +8,24 @@ const publicPages = [
   '/auth/reset-password',
 ]
 
-// Пути, которые middleware вообще не должен обрабатывать
 const excludedPaths = [
-  '/_next',            // статика Next.js
-  '/api/auth',         // API-роуты авторизации
-  '/auth/v1',          // запросы к Supabase API
-  '/favicon.ico',      // иконка
+  '/_next',
+  '/api/auth',
+  '/auth/v1',
+  '/favicon.ico',
+  '/logo.png',
+  '/manifest.json',
+  '/sw.js',
+  '/register-sw.js',
 ]
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // 1. Пропускаем исключённые пути мгновенно, без дальнейших проверок
   if (excludedPaths.some(path => pathname.startsWith(path))) {
     return NextResponse.next()
   }
 
-  // 2. Пропускаем публичные страницы (логин, регистрация, callback)
   if (publicPages.some(page => pathname === page || pathname.startsWith(page))) {
     return NextResponse.next()
   }
@@ -50,7 +50,6 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // 3. Проверяем сессию только для защищённых маршрутов
   const { data: { session } } = await supabase.auth.getSession()
 
   if (!session) {
@@ -59,7 +58,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // 4. Проверка ролей для админки и панели клинера
   if (pathname.startsWith('/dashboard/admin')) {
     const { data: profile } = await supabase
       .from('profiles')
@@ -93,7 +91,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Исключаем статические файлы и изображения
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

@@ -5,7 +5,11 @@ import { createClient } from '@/lib/supabase'
 import { useParams, useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import OrderChat from '@/components/OrderChat'
+<<<<<<< HEAD
 import { Calendar, MapPin, Phone, DollarSign, ExternalLink, ArrowLeft, Clock, User, Edit3, Save, X, CheckCircle } from 'lucide-react'
+=======
+import { Calendar, MapPin, Phone, DollarSign, ExternalLink, ArrowLeft, Clock, User, Edit3, Save, X, CheckCircle, ChevronDown } from 'lucide-react'
+>>>>>>> 0e0122b (v0.1)
 import Link from 'next/link'
 
 type Order = {
