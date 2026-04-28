@@ -10,7 +10,6 @@ const STATIC_ASSETS = [
   '/offline.html'
 ]
 
-// Функция логирования
 function log(level) {
   var args = Array.prototype.slice.call(arguments, 1)
   var prefix = '[SW]'
@@ -23,7 +22,6 @@ function log(level) {
   }
 }
 
-// Проверка: нужно ли кэшировать этот запрос
 function shouldCache(request) {
   var url = new URL(request.url)
   
@@ -45,7 +43,7 @@ self.addEventListener('install', function (event) {
   log('info', 'Installing...')
   event.waitUntil(
     caches.open(STATIC_CACHE).then(function (cache) {
-      return Promise.allSettled(
+      return Promise.all(
         STATIC_ASSETS.map(function (asset) {
           return cache.add(asset).catch(function (err) {
             log('warn', 'Failed to cache ' + asset + ':', err)
@@ -54,30 +52,29 @@ self.addEventListener('install', function (event) {
       )
     }).then(function () {
       log('info', 'Static assets cached')
+      return self.skipWaiting()
     })
   )
-  self.skipWaiting()
 })
 
 // Активация
 self.addEventListener('activate', function (event) {
   log('info', 'Activating...')
   event.waitUntil(
-    Promise.all([
-      caches.keys().then(function (keys) {
-        return Promise.all(
-          keys.map(function (key) {
-            if (key !== STATIC_CACHE && key !== DYNAMIC_CACHE) {
-              log('info', 'Deleting old cache:', key)
-              return caches.delete(key)
-            }
-          })
-        )
-      }),
-      self.clients.claim()
-    ])
+    caches.keys().then(function (keys) {
+      return Promise.all(
+        keys.map(function (key) {
+          if (key !== STATIC_CACHE && key !== DYNAMIC_CACHE) {
+            log('info', 'Deleting old cache:', key)
+            return caches.delete(key)
+          }
+        })
+      )
+    }).then(function () {
+      log('info', 'Activated')
+      return self.clients.claim()
+    })
   )
-  log('info', 'Activated')
 })
 
 // Fetch
@@ -88,10 +85,12 @@ self.addEventListener('fetch', function (event) {
     return
   }
   
-  // Навигация — Network First
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request, { redirect: 'follow' })
+        .then(function (response) {
+          return response
+        })
         .catch(function () {
           return caches.match(request).then(function (cached) {
             if (cached) return cached
@@ -107,55 +106,37 @@ self.addEventListener('fetch', function (event) {
     return
   }
   
-  // Остальные — Cache First + фоновое обновление
   event.respondWith(
     caches.match(request).then(function (cachedResponse) {
       if (cachedResponse) {
-        // Фоновое обновление
-        fetch(request, { redirect: 'follow' })
-          .then(function (networkResponse) {
-            if (networkResponse.status === 200) {
-              caches.open(DYNAMIC_CACHE).then(function (cache) {
-                cache.put(request, networkResponse.clone())
-              })
-            }
-          })
-          .catch(function () {})
-        
         return cachedResponse
       }
       
       return fetch(request, { redirect: 'follow' })
         .then(function (networkResponse) {
-          if (networkResponse.status === 200 && request.method === 'GET') {
+          if (networkResponse.status === 200) {
+            var responseClone = networkResponse.clone()
             caches.open(DYNAMIC_CACHE).then(function (cache) {
-              cache.put(request, networkResponse.clone()).catch(function () {})
+              cache.put(request, responseClone)
             })
           }
           return networkResponse
         })
-        .catch(function (error) {
-          log('warn', 'Fetch failed:', request.url, error)
-          
+        .catch(function () {
           if (request.destination === 'image') {
             return new Response(
               'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
-              {
-                status: 200,
-                headers: { 'Content-Type': 'image/gif' }
-              }
+              { status: 200, headers: { 'Content-Type': 'image/gif' } }
             )
           }
-          
           return new Response('Network error', { status: 503 })
         })
     })
   )
 })
 
-// Push-уведомления
+// Push
 self.addEventListener('push', function (event) {
-  log('info', 'Push received')
   var data = {}
   
   try {
@@ -183,16 +164,8 @@ self.addEventListener('push', function (event) {
       orderId: data.orderId
     },
     actions: [
-      {
-        action: 'open',
-        title: 'Открыть',
-        icon: '/logo.png'
-      },
-      {
-        action: 'close',
-        title: 'Закрыть',
-        icon: '/logo.png'
-      }
+      { action: 'open', title: 'Открыть' },
+      { action: 'close', title: 'Закрыть' }
     ]
   }
   
@@ -204,9 +177,8 @@ self.addEventListener('push', function (event) {
   )
 })
 
-// Клик по уведомлению
+// Notification click
 self.addEventListener('notificationclick', function (event) {
-  log('info', 'Notification clicked:', event.action)
   event.notification.close()
   
   if (event.action === 'close') return
@@ -231,10 +203,8 @@ self.addEventListener('notificationclick', function (event) {
   )
 })
 
-// Сообщения от основного потока
+// Messages
 self.addEventListener('message', function (event) {
-  log('info', 'Message received:', event.data)
-  
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting()
   }
@@ -245,7 +215,6 @@ self.addEventListener('message', function (event) {
         caches.delete(STATIC_CACHE),
         caches.delete(DYNAMIC_CACHE)
       ]).then(function () {
-        log('info', 'All caches cleared')
         self.clients.matchAll().then(function (clients) {
           clients.forEach(function (client) {
             client.postMessage({ type: 'CACHE_CLEARED' })
