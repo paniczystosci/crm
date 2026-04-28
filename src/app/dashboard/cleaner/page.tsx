@@ -5,8 +5,7 @@ import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { Calendar, MapPin, Phone, ArrowRight, Plus, Filter, Clock, User, DollarSign, AlertCircle, CheckCircle } from 'lucide-react'
-import { UnreadBadge } from '@/components/UnreadBadge'
+import { Calendar, MapPin, Phone, ArrowRight, Plus, Filter, Clock, User, DollarSign, AlertCircle, CheckCircle, BellDot, Eye, Sparkles } from 'lucide-react'
 
 type Order = {
   duration: string | null
@@ -21,6 +20,12 @@ type Order = {
   created_at: string
 }
 
+type UnreadInfo = {
+  orderId: string
+  count: number
+  lastMessageAt: string
+}
+
 export default function CleanerOrders() {
   const t = useTranslations('common')
   const ordersT = useTranslations('orders')
@@ -33,6 +38,8 @@ export default function CleanerOrders() {
   const [userId, setUserId] = useState<string | null>(null)
   const [checkingRole, setCheckingRole] = useState(true)
   const [acceptingId, setAcceptingId] = useState<string | null>(null)
+  const [unreadMap, setUnreadMap] = useState<Map<string, UnreadInfo>>(new Map())
+  const [hoveredOrder, setHoveredOrder] = useState<string | null>(null)
 
   const router = useRouter()
   const supabase = createClient()
@@ -61,84 +68,173 @@ export default function CleanerOrders() {
     cancelled: '❌',
   }
 
-useEffect(() => {
-  const init = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      router.push('/auth/login')
-      return
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (profile?.role === 'admin') {
-      router.replace('/dashboard/admin')
-      return
-    }
-    
-    setUserId(user.id)
-    setCheckingRole(false)
-    await fetchOrders() // Теперь fetchOrders загрузит заказы с текущим filter
-  }
-
-  init()
-}, [filter]) // 👈 ДОБАВЬТЕ filter в зависимости
-
-async function fetchOrders() {
-  setLoading(true)
-  setError(null)
-
-  try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      router.push('/auth/login')
-      return
-    }
-
-    // Загружаем все заказы
-    const { data, error } = await supabase
-      .from('orders')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Supabase error:', error)
-      setError(ordersT('loadError'))
-      setOrders([])
-    } else {
-      // 🔧 ФИЛЬТРАЦИЯ: только новые заказы ИЛИ свои
-      let filteredOrders = (data || []).filter(order => {
-        const isNew = order.status === 'new'
-        const isMine = order.cleaner_id === user.id
-        
-        // Отладка для каждого заказа
-        console.log(`Order ${order.id}: status=${order.status}, cleaner_id=${order.cleaner_id}, isNew=${isNew}, isMine=${isMine}, include=${isNew || isMine}`)
-        
-        return isNew || isMine
-      })
+  useEffect(() => {
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
       
-      // Применяем фильтр по статусу (если выбран не 'all')
-      if (filter !== 'all') {
-        filteredOrders = filteredOrders.filter(order => order.status === filter)
+      if (!user) {
+        router.push('/auth/login')
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      if (profile?.role === 'admin') {
+        router.replace('/dashboard/admin')
+        return
       }
       
-      console.log('Final filtered orders:', filteredOrders.length)
-      setOrders(filteredOrders)
+      setUserId(user.id)
+      setCheckingRole(false)
+      await fetchOrders()
     }
-  } catch (err) {
-    console.error('Unexpected error:', err)
-    setError(ordersT('loadError'))
-    setOrders([])
-  } finally {
-    setLoading(false)
+
+    init()
+  }, [filter])
+
+  // Загрузка непрочитанных сообщений
+  useEffect(() => {
+    if (userId && orders.length > 0) {
+      fetchAllUnreadMessages()
+      
+      // Подписка на новые сообщения
+      const channel = supabase
+        .channel('cleaner-new-messages')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'order_messages',
+          },
+          () => {
+            fetchAllUnreadMessages()
+          }
+        )
+        .subscribe()
+
+      return () => {
+        supabase.removeChannel(channel)
+      }
+    }
+  }, [userId, orders])
+
+  async function fetchOrders() {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+      if (authError || !user) {
+        router.push('/auth/login')
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Supabase error:', error)
+        setError(ordersT('loadError'))
+        setOrders([])
+      } else {
+        let filteredOrders = (data || []).filter(order => {
+          const isNew = order.status === 'new'
+          const isMine = order.cleaner_id === user.id
+          return isNew || isMine
+        })
+        
+        if (filter !== 'all') {
+          filteredOrders = filteredOrders.filter(order => order.status === filter)
+        }
+        
+        setOrders(filteredOrders)
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err)
+      setError(ordersT('loadError'))
+      setOrders([])
+    } finally {
+      setLoading(false)
+    }
   }
-}
+
+  // Функция для загрузки непрочитанных сообщений
+  async function fetchAllUnreadMessages() {
+    if (!userId || orders.length === 0) return
+
+    try {
+      const orderIds = orders.map(o => o.id)
+
+      // Получаем последние прочтения пользователя
+      const { data: reads } = await supabase
+        .from('order_chat_reads')
+        .select('order_id, last_read_at')
+        .eq('user_id', userId)
+
+      const readMap = new Map(
+        reads?.map(r => [r.order_id, new Date(r.last_read_at)]) || []
+      )
+
+      // Получаем последние сообщения по каждому заказу
+      const { data: messages } = await supabase
+        .from('order_messages')
+        .select('order_id, created_at')
+        .in('order_id', orderIds)
+        .order('created_at', { ascending: false })
+
+      // Считаем непрочитанные
+      const unread = new Map<string, UnreadInfo>()
+      
+      messages?.forEach(msg => {
+        const lastRead = readMap.get(msg.order_id)
+        const msgDate = new Date(msg.created_at)
+        
+        if (!lastRead || msgDate > lastRead) {
+          const existing = unread.get(msg.order_id)
+          if (!existing) {
+            unread.set(msg.order_id, {
+              orderId: msg.order_id,
+              count: 1,
+              lastMessageAt: msg.created_at
+            })
+          } else {
+            unread.set(msg.order_id, {
+              ...existing,
+              count: existing.count + 1
+            })
+          }
+        }
+      })
+
+      setUnreadMap(unread)
+    } catch (error) {
+      console.error('Error fetching unread messages:', error)
+    }
+  }
+
+  // Функция для форматирования времени последнего сообщения
+  const getLastMessageTime = (lastMessageAt?: string) => {
+    if (!lastMessageAt) return ''
+    const date = new Date(lastMessageAt)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'только что'
+    if (diffMins < 60) return `${diffMins} мин назад`
+    if (diffHours < 24) return `${diffHours} ч назад`
+    return `${diffDays} д назад`
+  }
 
   const acceptOrder = async (orderId: string) => {
     setAcceptingId(orderId)
@@ -163,9 +259,7 @@ async function fetchOrders() {
         console.error('Error accepting order:', error)
         alert(ordersT('loadError'))
       } else {
-        // Обновляем список заказов
         await fetchOrders()
-        // Переходим на страницу заказа
         router.push(`/dashboard/cleaner/orders/${orderId}`)
       }
     } catch (err) {
@@ -359,108 +453,176 @@ async function fetchOrders() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {orders.map((order, idx) => (
-            <div
-              key={order.id}
-              className="group animate-in slide-in-from-bottom-4 duration-500 relative"
-              style={{ animationDelay: `${idx * 50}ms` }}
-            >
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 relative">
-                <UnreadBadge orderId={order.id} userId={userId || undefined} />
-                
-                {/* Header */}
-                <div className="p-5 pb-3 border-b border-gray-100 dark:border-gray-700">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full font-medium ${statusColors[order.status]}`}>
-                        <span>{statusIcons[order.status]}</span>
-                        <span>{statusLabels[order.status]}</span>
-                      </span>
-                      <span className="text-xs text-gray-400 font-mono">
-                        #{order.id.slice(0, 8)}
-                      </span>
-                    </div>
-                    <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
-                      {order.price} zł
-                    </div>
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="p-5 space-y-3">
-                  <h3 className="font-semibold text-lg text-gray-900 dark:text-white line-clamp-1">
-                    {order.client_name}
-                  </h3>
-
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-start gap-2.5">
-                      <MapPin size={16} className="mt-0.5 text-gray-400 flex-shrink-0" />
-                      <span className="text-gray-600 dark:text-gray-400 line-clamp-2">
-                        {order.address}
-                      </span>
-                    </div>
-
-                    {order.planned_date && (
-                      <div className="flex items-center gap-2.5">
-                        <Calendar size={16} className="text-gray-400 flex-shrink-0" />
-                        <span className="text-gray-600 dark:text-gray-400">
-                          {new Date(order.planned_date).toLocaleDateString('ru-RU')}
-                          {order.planned_time && ` • ${order.planned_time.slice(0, 5)}`}
-                        </span>
+          {orders.map((order, idx) => {
+            const unreadInfo = unreadMap.get(order.id)
+            const hasUnread = !!unreadInfo
+            const isHovered = hoveredOrder === order.id
+            
+            return (
+              <Link
+                key={order.id}
+                href={`/dashboard/cleaner/orders/${order.id}`}
+                className="group animate-in slide-in-from-bottom-4 duration-500 block"
+                style={{ animationDelay: `${idx * 50}ms` }}
+                onMouseEnter={() => setHoveredOrder(order.id)}
+                onMouseLeave={() => setHoveredOrder(null)}
+              >
+                <div className={`
+                  relative bg-white dark:bg-gray-800 rounded-2xl shadow-lg border transition-all duration-300 overflow-hidden
+                  ${hasUnread 
+                    ? 'border-amber-300 dark:border-amber-700 shadow-amber-100 dark:shadow-amber-950/20' 
+                    : 'border-gray-200 dark:border-gray-700'
+                  }
+                  hover:shadow-xl hover:-translate-y-0.5
+                `}>
+                  {/* Уведомление badge */}
+                  {hasUnread && (
+                    <div className="absolute -top-3 -right-3 z-10">
+                      <div className="relative">
+                        <div className="absolute inset-0 animate-ping rounded-full bg-red-400 opacity-60"></div>
+                        <div className="relative flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-red-500 to-amber-500 rounded-full shadow-lg">
+                          <BellDot size={14} className="text-white animate-bounce" />
+                          <span className="text-xs font-bold text-white">
+                            {unreadInfo.count} {unreadInfo.count === 1 ? 'новое сообщение' : 'новых сообщений'}
+                          </span>
+                          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></span>
+                        </div>
                       </div>
-                    )}
-
-                    {order.planned_time && order.duration && (
-                      <div className="flex items-center gap-2.5">
-                        <Clock size={16} className="text-gray-400 flex-shrink-0" />
-                        <span className="text-gray-600 dark:text-gray-400">
-                          {order.planned_time.slice(0, 5)} • {order.duration} {t('minutes')}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-2.5">
-                      <Phone size={16} className="text-gray-400 flex-shrink-0" />
-                      <span className="text-gray-600 dark:text-gray-400">{order.client_phone}</span>
                     </div>
-                  </div>
-                </div>
-
-                {/* Footer - Кнопки действий */}
-                <div className="px-5 py-3 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center gap-3">
-                  {order.status === 'new' ? (
-                    <button
-                      onClick={() => acceptOrder(order.id)}
-                      disabled={acceptingId === order.id}
-                      className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl text-sm font-medium transition-all duration-200"
-                    >
-                      {acceptingId === order.id ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                          <span>{t('loading')}</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle size={16} />
-                          <span>{ordersT('accept')}</span>
-                        </>
-                      )}
-                    </button>
-                  ) : (
-                    <div className="flex-1"></div>
                   )}
-                  
-                  <Link
-                    href={`/dashboard/cleaner/orders/${order.id}`}
-                    className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-sm font-medium group-hover:gap-2 transition-all"
-                  >
-                    {ordersT('details')}
-                    <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
-                  </Link>
+
+                  {/* Header */}
+                  <div className="p-5 pb-3 border-b border-gray-100 dark:border-gray-700">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full font-medium ${statusColors[order.status]}`}>
+                          <span>{statusIcons[order.status]}</span>
+                          <span>{statusLabels[order.status]}</span>
+                        </span>
+                        <span className="text-xs text-gray-400 font-mono">
+                          #{order.id.slice(0, 8)}
+                        </span>
+                        {hasUnread && (
+                          <span className="inline-flex items-center gap-1 text-xs text-red-500 dark:text-red-400 animate-pulse font-medium">
+                            <Sparkles size={10} />
+                            <span>Новое</span>
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                        {order.price} zł
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="p-5 space-y-3">
+                    <h3 className={`
+                      font-semibold text-lg mb-2 line-clamp-1 transition-colors
+                      ${hasUnread 
+                        ? 'text-red-600 dark:text-red-400' 
+                        : 'text-gray-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400'
+                      }
+                    `}>
+                      {order.client_name}
+                      {hasUnread && <span className="ml-2 text-red-500">🔴</span>}
+                    </h3>
+
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-start gap-2.5">
+                        <MapPin size={16} className="mt-0.5 text-gray-400 flex-shrink-0" />
+                        <span className="text-gray-600 dark:text-gray-400 line-clamp-2">
+                          {order.address}
+                        </span>
+                      </div>
+
+                      {order.planned_date && (
+                        <div className="flex items-center gap-2.5">
+                          <Calendar size={16} className="text-gray-400 flex-shrink-0" />
+                          <span className="text-gray-600 dark:text-gray-400">
+                            {new Date(order.planned_date).toLocaleDateString('ru-RU')}
+                            {order.planned_time && ` • ${order.planned_time.slice(0, 5)}`}
+                          </span>
+                        </div>
+                      )}
+
+                      {order.planned_time && order.duration && (
+                        <div className="flex items-center gap-2.5">
+                          <Clock size={16} className="text-gray-400 flex-shrink-0" />
+                          <span className="text-gray-600 dark:text-gray-400">
+                            {order.planned_time.slice(0, 5)} • {order.duration} {t('minutes')}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2.5">
+                        <Phone size={16} className="text-gray-400 flex-shrink-0" />
+                        <span className="text-gray-600 dark:text-gray-400">{order.client_phone}</span>
+                      </div>
+                    </div>
+
+                    {/* Информация о последнем сообщении */}
+                    {hasUnread && unreadInfo.lastMessageAt && (
+                      <div className="mt-3 pt-2 border-t border-amber-200 dark:border-amber-800/30">
+                        <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                          <BellDot size={10} />
+                          Последнее сообщение: {getLastMessageTime(unreadInfo.lastMessageAt)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer - Кнопки действий */}
+                  <div className="px-5 py-3 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center gap-3">
+                    {order.status === 'new' ? (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          acceptOrder(order.id)
+                        }}
+                        disabled={acceptingId === order.id}
+                        className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl text-sm font-medium transition-all duration-200"
+                      >
+                        {acceptingId === order.id ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                            <span>{t('loading')}</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle size={16} />
+                            <span>{ordersT('accept')}</span>
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <div className="flex-1"></div>
+                    )}
+                    
+                    <div className={`
+                      inline-flex items-center gap-1 font-medium transition-all duration-300
+                      ${hasUnread 
+                        ? 'text-red-600 dark:text-red-400 gap-2' 
+                        : 'text-emerald-600 dark:text-emerald-400 group-hover:gap-2'
+                      }
+                    `}>
+                      <span className="text-sm">
+                        {hasUnread ? 'Перейти к сообщению' : ordersT('details')}
+                      </span>
+                      {hasUnread ? (
+                        <Eye size={14} className="animate-pulse" />
+                      ) : (
+                        <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Индикатор прогресса кликабельности */}
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 to-emerald-300 rounded-b-2xl scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300" />
                 </div>
-              </div>
-            </div>
-          ))}
+              </Link>
+            )
+          })}
         </div>
       )}
     </div>
