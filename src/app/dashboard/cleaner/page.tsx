@@ -456,7 +456,6 @@ export default function CleanerOrders() {
           {orders.map((order, idx) => {
             const unreadInfo = unreadMap.get(order.id)
             const hasUnread = !!unreadInfo
-            const isHovered = hoveredOrder === order.id
             
             return (
               <Link
@@ -468,129 +467,126 @@ export default function CleanerOrders() {
                 onMouseLeave={() => setHoveredOrder(null)}
               >
                 <div className={`
-                  relative bg-white dark:bg-gray-800 rounded-2xl shadow-lg border transition-all duration-300 overflow-hidden
+                  relative bg-white dark:bg-gray-800 rounded-2xl shadow-lg border transition-all duration-300 overflow-visible
                   ${hasUnread 
                     ? 'border-amber-300 dark:border-amber-700 shadow-amber-100 dark:shadow-amber-950/20' 
                     : 'border-gray-200 dark:border-gray-700'
                   }
                   hover:shadow-xl hover:-translate-y-0.5
                 `}>
-                  {/* Уведомление badge */}
+                  {/* Бейдж с количеством новых сообщений */}
                   {hasUnread && (
-                    <div className="absolute -top-3 -right-3 z-10">
+                    <div className="absolute -top-2 -right-2 z-20">
                       <div className="relative">
                         <div className="absolute inset-0 animate-ping rounded-full bg-red-400 opacity-60"></div>
-                        <div className="relative flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-red-500 to-amber-500 rounded-full shadow-lg">
-                          <BellDot size={14} className="text-white animate-bounce" />
-                          <span className="text-xs font-bold text-white">
-                            {unreadInfo.count} {unreadInfo.count === 1 ? 'новое сообщение' : 'новых сообщений'}
+                        <div className="relative flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-gradient-to-r from-red-500 to-amber-500 rounded-full shadow-lg">
+                          <span className="text-[10px] font-bold text-white">
+                            {unreadInfo.count}
                           </span>
-                          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></span>
                         </div>
                       </div>
                     </div>
                   )}
 
+                  {/* Индикатор "Новое сообщение" */}
+                  {hasUnread && (
+                    <div className="absolute top-2 left-2 z-10">
+                      <div className="flex items-center gap-1 px-2 py-0.5 bg-red-100 dark:bg-red-900/50 rounded-full">
+                        <Sparkles size={10} className="text-red-500 animate-pulse" />
+                        <span className="text-[10px] font-medium text-red-600 dark:text-red-400 whitespace-nowrap">
+                          Новое сообщение
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Header */}
-                  <div className="p-5 pb-3 border-b border-gray-100 dark:border-gray-700">
+                  <div className="p-4 pb-3 border-b border-gray-100 dark:border-gray-700">
                     <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full font-medium ${statusColors[order.status]}`}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full font-medium ${statusColors[order.status]}`}>
                           <span>{statusIcons[order.status]}</span>
                           <span>{statusLabels[order.status]}</span>
                         </span>
                         <span className="text-xs text-gray-400 font-mono">
                           #{order.id.slice(0, 8)}
                         </span>
-                        {hasUnread && (
-                          <span className="inline-flex items-center gap-1 text-xs text-red-500 dark:text-red-400 animate-pulse font-medium">
-                            <Sparkles size={10} />
-                            <span>Новое</span>
-                          </span>
-                        )}
                       </div>
-                      <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                      <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
                         {order.price} zł
                       </div>
                     </div>
                   </div>
 
                   {/* Content */}
-                  <div className="p-5 space-y-3">
+                  <div className="p-4 space-y-3">
                     <h3 className={`
-                      font-semibold text-lg mb-2 line-clamp-1 transition-colors
+                      font-semibold text-base line-clamp-1 transition-colors
                       ${hasUnread 
                         ? 'text-red-600 dark:text-red-400' 
                         : 'text-gray-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400'
                       }
                     `}>
                       {order.client_name}
-                      {hasUnread && <span className="ml-2 text-red-500">🔴</span>}
                     </h3>
 
                     <div className="space-y-2 text-sm">
-                      <div className="flex items-start gap-2.5">
-                        <MapPin size={16} className="mt-0.5 text-gray-400 flex-shrink-0" />
-                        <span className="text-gray-600 dark:text-gray-400 line-clamp-2">
+                      <div className="flex items-start gap-2">
+                        <MapPin size={14} className="mt-0.5 text-gray-400 flex-shrink-0" />
+                        <span className="text-gray-600 dark:text-gray-400 line-clamp-2 text-xs">
                           {order.address}
                         </span>
                       </div>
 
                       {order.planned_date && (
-                        <div className="flex items-center gap-2.5">
-                          <Calendar size={16} className="text-gray-400 flex-shrink-0" />
-                          <span className="text-gray-600 dark:text-gray-400">
+                        <div className="flex items-center gap-2">
+                          <Calendar size={14} className="text-gray-400 flex-shrink-0" />
+                          <span className="text-gray-600 dark:text-gray-400 text-xs">
                             {new Date(order.planned_date).toLocaleDateString('ru-RU')}
                             {order.planned_time && ` • ${order.planned_time.slice(0, 5)}`}
                           </span>
                         </div>
                       )}
 
-                      {order.planned_time && order.duration && (
-                        <div className="flex items-center gap-2.5">
-                          <Clock size={16} className="text-gray-400 flex-shrink-0" />
-                          <span className="text-gray-600 dark:text-gray-400">
-                            {order.planned_time.slice(0, 5)} • {order.duration} {t('minutes')}
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2.5">
-                        <Phone size={16} className="text-gray-400 flex-shrink-0" />
-                        <span className="text-gray-600 dark:text-gray-400">{order.client_phone}</span>
+                      <div className="flex items-center gap-2">
+                        <Phone size={14} className="text-gray-400 flex-shrink-0" />
+                        <span className="text-gray-600 dark:text-gray-400 text-xs">{order.client_phone}</span>
                       </div>
                     </div>
 
                     {/* Информация о последнем сообщении */}
                     {hasUnread && unreadInfo.lastMessageAt && (
-                      <div className="mt-3 pt-2 border-t border-amber-200 dark:border-amber-800/30">
-                        <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                          <BellDot size={10} />
-                          Последнее сообщение: {getLastMessageTime(unreadInfo.lastMessageAt)}
+                      <div className="mt-2 pt-2 border-t border-amber-200 dark:border-amber-800/30">
+                        <p className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                          <BellDot size={8} />
+                          <span className="truncate">
+                            Последнее: {getLastMessageTime(unreadInfo.lastMessageAt)}
+                          </span>
                         </p>
                       </div>
                     )}
                   </div>
 
-                  {/* Footer - Кнопки действий */}
-                  <div className="px-5 py-3 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center gap-3">
+                  {/* Footer */}
+                  <div className="px-4 py-2.5 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center gap-3">
                     {order.status === 'new' ? (
                       <button
                         onClick={(e) => {
                           e.preventDefault()
+                          e.stopPropagation()
                           acceptOrder(order.id)
                         }}
                         disabled={acceptingId === order.id}
-                        className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl text-sm font-medium transition-all duration-200"
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg text-xs font-medium transition-all duration-200"
                       >
                         {acceptingId === order.id ? (
                           <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                            <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></div>
                             <span>{t('loading')}</span>
                           </>
                         ) : (
                           <>
-                            <CheckCircle size={16} />
+                            <CheckCircle size={12} />
                             <span>{ordersT('accept')}</span>
                           </>
                         )}
@@ -600,24 +596,22 @@ export default function CleanerOrders() {
                     )}
                     
                     <div className={`
-                      inline-flex items-center gap-1 font-medium transition-all duration-300
+                      inline-flex items-center gap-1 text-xs font-medium transition-all duration-300
                       ${hasUnread 
-                        ? 'text-red-600 dark:text-red-400 gap-2' 
-                        : 'text-emerald-600 dark:text-emerald-400 group-hover:gap-2'
+                        ? 'text-red-600 dark:text-red-400 gap-1.5' 
+                        : 'text-emerald-600 dark:text-emerald-400 group-hover:gap-1.5'
                       }
                     `}>
-                      <span className="text-sm">
-                        {hasUnread ? 'Перейти к сообщению' : ordersT('details')}
-                      </span>
+                      <span>{hasUnread ? 'К чату' : ordersT('details')}</span>
                       {hasUnread ? (
-                        <Eye size={14} className="animate-pulse" />
+                        <Eye size={12} className="animate-pulse" />
                       ) : (
-                        <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                        <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
                       )}
                     </div>
                   </div>
 
-                  {/* Индикатор прогресса кликабельности */}
+                  {/* Индикатор прогресса */}
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 to-emerald-300 rounded-b-2xl scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300" />
                 </div>
               </Link>
