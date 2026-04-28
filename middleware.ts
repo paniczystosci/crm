@@ -8,24 +8,47 @@ const publicPages = [
   '/auth/reset-password',
 ]
 
-const excludedPaths = [
-  '/_next',
-  '/api/auth',
-  '/auth/v1',
-  '/favicon.ico',
-  '/logo.png',
+// Точные пути для исключения (без авторизации)
+const exactExcludedPaths = [
   '/manifest.json',
   '/sw.js',
   '/register-sw.js',
+  '/offline.html',
+  '/favicon.ico',
+  '/logo.png',
 ]
+
+// Префиксы для исключения
+const excludedPrefixes = [
+  '/_next',
+  '/api/auth',
+  '/auth/v1',
+  '/icons/',
+  '/images/',
+]
+
+// Расширения файлов, которые не требуют авторизации
+const staticFileExtensions = ['.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.json', '.js']
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  if (excludedPaths.some(path => pathname.startsWith(path))) {
+  // Проверка точных совпадений
+  if (exactExcludedPaths.includes(pathname)) {
     return NextResponse.next()
   }
 
+  // Проверка по префиксам
+  if (excludedPrefixes.some(prefix => pathname.startsWith(prefix))) {
+    return NextResponse.next()
+  }
+
+  // Проверка по расширениям файлов
+  if (staticFileExtensions.some(ext => pathname.endsWith(ext))) {
+    return NextResponse.next()
+  }
+
+  // Публичные страницы
   if (publicPages.some(page => pathname === page || pathname.startsWith(page))) {
     return NextResponse.next()
   }
@@ -93,6 +116,13 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    /*
+     * Match all request paths except:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder files (icons, images, etc.)
+     */
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|json|js)$).*)',
   ],
 }
