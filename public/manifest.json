@@ -14,7 +14,7 @@
   "related_applications": [],
   "icons": [
     {
-      "src": "/logo.png",
+      "src": "/icons/logo.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
@@ -28,7 +28,7 @@
       "url": "/dashboard/cleaner/new",
       "icons": [
         {
-          "src": "/logo.png",
+          "src": "/icons/logo.png",
           "sizes": "96x96"
         }
       ]
@@ -40,7 +40,7 @@
       "url": "/dashboard/cleaner/orders",
       "icons": [
         {
-          "src": "/logo.png",
+          "src": "/icons/logo.png",
           "sizes": "96x96"
         }
       ]
