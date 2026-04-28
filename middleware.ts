@@ -58,6 +58,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  // Проверка ролей для admin
   if (pathname.startsWith('/dashboard/admin')) {
     const { data: profile } = await supabase
       .from('profiles')
@@ -72,6 +73,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // Проверка ролей для cleaner
   if (pathname.startsWith('/dashboard/cleaner')) {
     const { data: profile } = await supabase
       .from('profiles')
@@ -93,17 +95,4 @@ export const config = {
   matcher: [
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
-}
-
-// После проверки ролей добавьте:
-const { data: profile } = await supabase
-  .from('profiles')
-  .select('role')
-  .eq('id', session.user.id)
-  .single()
-
-// Если роли нет - разлогинить
-if (!profile?.role) {
-  await supabase.auth.signOut()
-  return NextResponse.redirect(new URL('/auth/login', request.url))
 }
