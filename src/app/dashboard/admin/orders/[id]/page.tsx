@@ -5,7 +5,6 @@ import { createClient } from '@/lib/supabase'
 import { useParams, useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import OrderChat from '@/components/OrderChat'
-import { Calendar, MapPin, Phone, DollarSign, ExternalLink, ArrowLeft, Clock, User, Edit3, Save, X, CheckCircle } from 'lucide-react'
 import { Calendar, MapPin, Phone, DollarSign, ExternalLink, ArrowLeft, Clock, User, Edit3, Save, X, CheckCircle, ChevronDown } from 'lucide-react'
 import Link from 'next/link'
 
@@ -186,7 +185,6 @@ export default function AdminOrderDetail() {
     fetchCleaners()
   }, [id])
 
-  // Подписка на изменения заказа
   useEffect(() => {
     const channel = supabase
       .channel(`order_${id}`)
