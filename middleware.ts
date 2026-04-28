@@ -94,3 +94,16 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
+
+// После проверки ролей добавьте:
+const { data: profile } = await supabase
+  .from('profiles')
+  .select('role')
+  .eq('id', session.user.id)
+  .single()
+
+// Если роли нет - разлогинить
+if (!profile?.role) {
+  await supabase.auth.signOut()
+  return NextResponse.redirect(new URL('/auth/login', request.url))
+}

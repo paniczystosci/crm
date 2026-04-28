@@ -5,8 +5,9 @@ const DYNAMIC_CACHE = 'dynamic-v1'
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
-  '/icons/logo.png',
-  '/favicon.ico'
+  '/logo.png',
+  '/favicon.ico',
+  '/offline.html'
 ]
 
 function log(level) {
@@ -80,28 +81,45 @@ self.addEventListener('activate', function (event) {
 self.addEventListener('fetch', function (event) {
   var request = event.request
   
-  // Пропускаем всё, что не на нашем домене
   if (!shouldCache(request)) {
     return
   }
   
-  // Пропускаем навигацию — пусть Next.js сам разбирается с редиректами
-  if (request.mode === 'navigate') {
-    return
-  }
+// Обработка навигации (переход по страницам)
+if (request.mode === 'navigate') {
+  event.respondWith(
+    fetch(request).catch(() => {
+      return caches.match('/offline.html')
+    })
+  )
+  return
+}
   
-  // Кэшируем только статику (изображения, шрифты, CSS)
   event.respondWith(
     caches.match(request).then(function (cachedResponse) {
-      return cachedResponse || fetch(request).then(function (networkResponse) {
-        if (networkResponse.status === 200) {
-          var responseClone = networkResponse.clone()
-          caches.open(DYNAMIC_CACHE).then(function (cache) {
-            cache.put(request, responseClone)
-          })
-        }
-        return networkResponse
-      })
+      if (cachedResponse) {
+        return cachedResponse
+      }
+      
+      return fetch(request, { redirect: 'follow' })
+        .then(function (networkResponse) {
+          if (networkResponse.status === 200) {
+            var responseClone = networkResponse.clone()
+            caches.open(DYNAMIC_CACHE).then(function (cache) {
+              cache.put(request, responseClone)
+            })
+          }
+          return networkResponse
+        })
+        .catch(function () {
+          if (request.destination === 'image') {
+            return new Response(
+              'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+              { status: 200, headers: { 'Content-Type': 'image/gif' } }
+            )
+          }
+          return new Response('Network error', { status: 503 })
+        })
     })
   )
 })
@@ -124,8 +142,8 @@ self.addEventListener('push', function (event) {
   
   var options = {
     body: data.body || 'У вас новое уведомление',
-    icon: '/icons/logo.png',
-    badge: '/icons/logo.png',
+    icon: '/logo.png',
+    badge: '/logo.png',
     vibrate: [200, 100, 200],
     tag: data.orderId || 'default',
     renotify: true,
